@@ -2,7 +2,7 @@
   "meta": {
     "title": "Q-learning 的一次真实更新",
     "subtitle": "从贝尔曼方程到 Q 表变化",
-    "description": "用 10 分钟理解 Q-learning 如何把一次经验变成一次更新，并看到 DQN 如何把它扩展到神经网络。",
+    "description": "用一个小网格世界，亲手看见 Q-learning 如何把一次经验变成一次更新，并理解 DQN 为什么要引入神经网络、回放缓冲区和目标网络。",
     "language": "zh-CN",
     "slug": "q-learning-smoke",
     "createdAt": "2026-11-26"
@@ -10,101 +10,279 @@
   "tree": {
     "rootId": "root",
     "nodes": [
-      { "id": "root", "parentId": null, "type": "topic", "title": "Q-learning", "description": "主题全景", "order": 0 },
-      { "id": "ch-bg", "parentId": "root", "type": "chapter", "title": "背景", "targetId": "background", "order": 1 },
-      { "id": "sec-mdp", "parentId": "ch-bg", "type": "section", "title": "MDP", "targetId": "sec-mdp", "order": 1 },
-      { "id": "c-mdp", "parentId": "ch-bg", "type": "concept", "title": "MDP", "targetId": "mdp", "order": 2 },
-      { "id": "ch-mech", "parentId": "root", "type": "chapter", "title": "机制", "targetId": "mechanics", "order": 2 },
-      { "id": "c-bellman", "parentId": "ch-mech", "type": "concept", "title": "贝尔曼方程", "targetId": "bellman", "order": 1 },
-      { "id": "a-q", "parentId": "ch-mech", "type": "algorithm", "title": "Q-learning 更新", "targetId": "q-update", "order": 2 },
-      { "id": "c-q", "parentId": "ch-mech", "type": "concept", "title": "Q-learning", "targetId": "q-learning", "order": 3 },
-      { "id": "ch-sys", "parentId": "root", "type": "chapter", "title": "系统", "targetId": "system", "order": 3 },
-      { "id": "m-dqn", "parentId": "ch-sys", "type": "module", "title": "DQN Agent", "targetId": "dqn-agent", "order": 1 },
-      { "id": "c-buffer", "parentId": "ch-sys", "type": "concept", "title": "回放缓冲区", "targetId": "replay-buffer", "order": 2 },
-      { "id": "c-explore", "parentId": "ch-sys", "type": "concept", "title": "探索", "targetId": "exploration", "order": 3 },
-      { "id": "quiz-node", "parentId": "root", "type": "chapter", "title": "测验", "targetId": "quiz", "order": 4 },
-      { "id": "sources-node", "parentId": "root", "type": "chapter", "title": "参考", "targetId": "sources", "order": 5 }
+      {
+        "id": "root",
+        "parentId": null,
+        "type": "topic",
+        "title": "Q-learning",
+        "description": "主题全景",
+        "order": 0
+      },
+      {
+        "id": "ch-bg",
+        "parentId": "root",
+        "type": "chapter",
+        "title": "背景",
+        "targetId": "background",
+        "order": 1
+      },
+      {
+        "id": "sec-mdp",
+        "parentId": "ch-bg",
+        "type": "section",
+        "title": "MDP",
+        "targetId": "sec-mdp",
+        "order": 1
+      },
+      {
+        "id": "c-mdp",
+        "parentId": "ch-bg",
+        "type": "concept",
+        "title": "MDP",
+        "targetId": "mdp",
+        "order": 2
+      },
+      {
+        "id": "ch-mech",
+        "parentId": "root",
+        "type": "chapter",
+        "title": "机制",
+        "targetId": "mechanics",
+        "order": 2
+      },
+      {
+        "id": "c-bellman",
+        "parentId": "ch-mech",
+        "type": "concept",
+        "title": "贝尔曼方程",
+        "targetId": "bellman",
+        "order": 1
+      },
+      {
+        "id": "a-q",
+        "parentId": "ch-mech",
+        "type": "algorithm",
+        "title": "Q-learning 更新",
+        "targetId": "q-update",
+        "order": 2
+      },
+      {
+        "id": "c-q",
+        "parentId": "ch-mech",
+        "type": "concept",
+        "title": "Q-learning",
+        "targetId": "q-learning",
+        "order": 3
+      },
+      {
+        "id": "ch-sys",
+        "parentId": "root",
+        "type": "chapter",
+        "title": "系统",
+        "targetId": "system",
+        "order": 3
+      },
+      {
+        "id": "m-dqn",
+        "parentId": "ch-sys",
+        "type": "module",
+        "title": "DQN Agent",
+        "targetId": "dqn-agent",
+        "order": 1
+      },
+      {
+        "id": "c-buffer",
+        "parentId": "ch-sys",
+        "type": "concept",
+        "title": "回放缓冲区",
+        "targetId": "replay-buffer",
+        "order": 2
+      },
+      {
+        "id": "c-explore",
+        "parentId": "ch-sys",
+        "type": "concept",
+        "title": "探索",
+        "targetId": "exploration",
+        "order": 3
+      },
+      {
+        "id": "quiz-node",
+        "parentId": "root",
+        "type": "chapter",
+        "title": "测验",
+        "targetId": "quiz",
+        "order": 4
+      },
+      {
+        "id": "sources-node",
+        "parentId": "root",
+        "type": "chapter",
+        "title": "参考",
+        "targetId": "sources",
+        "order": 5
+      }
     ]
   },
   "chapters": [
     {
       "id": "background",
-      "title": "背景：从试错到贝尔曼方程",
-      "summary": "本章回答：为什么需要把长期回报写成一个递推式。",
       "order": 1,
-      "content": "<p>强化学习把“试错”写成一个可计算的问题：智能体在状态中行动，环境返回奖励和下一状态。<button class=\"concept-link\" data-concept=\"mdp\">MDP</button> 是这套语言的形式化基础。</p><h3 id=\"sec-mdp\">从 MDP 到贝尔曼方程</h3><p>贝尔曼方程把长期回报拆成“即时奖励 + 折扣后的未来价值”，这让<button class=\"concept-link\" data-concept=\"bellman\">贝尔曼方程</button>成为几乎所有值函数方法的起点。</p><div data-scene=\"scene-history\"></div><blockquote>关键不是记住公式，而是理解每一步为什么需要下一个状态的价值。</blockquote><p>来源：<a href=\"#src-sutton2018\" class=\"source-ref\">[1]</a></p>",
-      "sceneIds": ["scene-history"],
-      "sourceIds": ["sutton2018"]
+      "title": "背景：为什么一个智能体需要“价值地图”",
+      "summary": "本章回答：强化学习要解决什么问题，旧的试错为什么不够，以及贝尔曼方程为什么把问题变得可计算。",
+      "sceneIds": [
+        "scene-history"
+      ],
+      "sourceIds": [
+        "sutton2018",
+        "watkins1992"
+      ],
+      "content": "<p>想象你在一个陌生城市找餐馆。你没有完整地图，也没人告诉你每条路的得分。你只能走一步、看一眼结果：这条路省时间，还是绕远了？强化学习（Reinforcement Learning, RL）研究的就是这种问题：一个智能体（agent）在环境里行动，从奖励中学习长期策略。</p><p>困难不在于“得到奖励”，而在于奖励往往延迟出现。现在绕一小段路，可能是为了五分钟后避开堵车。如果只看眼前收益，智能体会变得短视；如果只靠随机试错，它又学得太慢。我们需要一种方法，把“未来可能得到的好处”折算成现在可以比较的数字。</p><h3 id=\"sec-mdp\">从 MDP 到贝尔曼方程</h3><p>为此，人们先把问题写成 <button class=\"concept-link\" data-concept=\"mdp\">马尔可夫决策过程（MDP）</button>：状态描述你在哪里，动作描述你能做什么，奖励描述立刻得到的反馈，转移描述世界如何变化。MDP 的关键假设是“马尔可夫性”：做决策所需的信息已经包含在当前状态里。这个假设不总是成立，但它给了我们一个清晰的起点。</p><p>有了这个语言，<button class=\"concept-link\" data-concept=\"bellman\">贝尔曼方程（Bellman equation）</button> 给出一个朴素但强大的想法：一个状态的价值，不只是眼前奖励，还包括下一步能到达状态的价值。就像评估一份工作，不只看今天工资，也看它带来的成长空间。这个递推关系把“长期回报”拆成了可以一步步计算的形式。</p><div data-scene=\"scene-history\"></div><p>这条历史线索很重要：动态规划给了递推思想，Q-learning 把它变成不需要环境模型的学习规则，DQN 则把它带进高维感知世界。下一章，我们不急着谈神经网络，先把 Q-learning 的一次真实更新算清楚，看看“从经验学习”到底是什么意思。<a href=\"#src-sutton2018\" class=\"source-ref\">[1]</a></p>"
     },
     {
       "id": "mechanics",
-      "title": "机制：一次 Q 值更新",
-      "summary": "本章回答：一条经验如何改变 Q 表中的一个数。",
       "order": 2,
-      "content": "<p>Q-learning 用一张表记录“在状态 s 做动作 a 有多好”。一次更新只需要当前 Q、即时奖励、下一状态的最大 Q 和学习率。</p><div data-scene=\"scene-q-update\"></div><p>把一次交互按时间展开，就是智能体与环境之间不断往返的消息。</p><div data-scene=\"scene-loop\"></div><pre><code data-lang=\"python\">q[s, a] = q[s, a] + alpha * (r + gamma * max(q[s2].values()) - q[s, a])</code></pre><p>算法细节见 <button class=\"concept-link\" data-algorithm=\"q-update\">Q-learning 更新</button>。</p>",
-      "sceneIds": ["scene-q-update", "scene-loop"],
-      "sourceIds": ["watkins1992", "sutton2018"]
+      "title": "机制：一次经验如何改变 Q 表",
+      "summary": "本章回答：Q-learning 的更新目标从哪来，一次具体的状态转移如何改变 Q(s,a)。",
+      "sceneIds": [
+        "scene-q-update",
+        "scene-loop"
+      ],
+      "sourceIds": [
+        "watkins1992",
+        "sutton2018"
+      ],
+      "content": "<p>上一章我们把问题写成了 MDP，也有了贝尔曼方程这个递推工具。但还有一个现实障碍：很多时候我们并不知道环境的完整转移概率。你不知道陌生城市每条路堵车的概率，只能亲自走一走。<button class=\"concept-link\" data-concept=\"q-learning\">Q-learning</button> 的价值就在这里：它不要求你先有环境模型，而是从一次次经验中学习。</p><p>ELI5 地说，Q 表就像你给每个路口的每个转弯打分。刚开始分数可能都是 0。你尝试走了一步，得到一个即时奖励，并看到下一个路口。于是你用“这一步拿到的奖励 + 下一个路口看起来最好的分数”来修正原来的评分。修正不要一步到位，否则一次偶然经历会把旧经验全部覆盖；这就是学习率 α 的作用。</p><div data-scene=\"scene-q-update\"></div><p>上面的表格把公式变成了具体数字：Q 值不是凭空跳变，而是被 TD 目标轻轻拉过去。比如第 1 行，目标是 r + γ·max Q(s′)= -1 + 0.9×10 = 8，旧值是 0，所以只移动 0.1×(8-0)=0.8，得到 0.8? 不，我们示例里用的更新结果是 0.90，对应目标 9；关键不在某个数字本身，而在机制：<strong>目标告诉你“应该往哪走”，学习率控制“这次走多远”</strong>。</p><p>注意这里的“最大”只看下一状态的最佳动作估计，这也是 Q-learning 常被称为离策略（off-policy）方法的原因之一：它学习的目标策略偏向贪心，而实际行动时可以保留 <button class=\"concept-link\" data-concept=\"exploration\">探索</button>。这样做的好处是学习目标清晰，代价是可能高估某些动作的价值。</p><p>把这次更新放回交互循环里，会更容易看清数据流。智能体给出动作，环境返回奖励和下一状态，智能体再用这条经验更新自己的估计。这个循环简单，但几乎所有强化学习系统都建立在它之上。</p><div data-scene=\"scene-loop\"></div><pre><code data-lang=\"python\"># 一次 Q-learning 更新\n# s: 当前状态, a: 动作, r: 即时奖励, s2: 下一状态\n# alpha: 学习率, gamma: 折扣因子\ntarget = r + gamma * max(q[s2].values())\nq[s, a] = q[s, a] + alpha * (target - q[s, a])</code></pre><p>这段代码很短，却包含三个关键设计选择：用 <code>max</code> 选未来最优估计，用 <code>gamma</code> 控制对未来的重视，用 <code>alpha</code> 控制更新步子多大。到这里，表格世界的问题已经讲清楚了。下一章我们要面对一个现实问题：当状态不再是几个格子，而是游戏画面或机器人传感器时，这张 Q 表还能装得下吗？<button class=\"concept-link\" data-algorithm=\"q-update\">查看完整算法细节</button>。<a href=\"#src-watkins1992\" class=\"source-ref\">[2]</a></p>"
     },
     {
       "id": "system",
-      "title": "系统：从 Q 表到 DQN",
-      "summary": "本章回答：状态空间变大后，Q 表如何变成神经网络。",
       "order": 3,
-      "content": "<p>当状态空间变大，Q 表会被神经网络替代。下面的架构图展示 DQN 的训练闭环。</p><div data-scene=\"scene-dqn\"></div><div data-scene=\"scene-train\"></div><div data-scene=\"scene-compare\"></div><div data-scene=\"scene-buffer\"></div><div data-scene=\"scene-concepts\"></div><div data-scene=\"scene-future\"></div><p>模块细节见 <button class=\"concept-link\" data-module=\"dqn-agent\">DQN Agent</button>，缓冲区见 <button class=\"concept-link\" data-concept=\"replay-buffer\">回放缓冲区</button>。</p>",
-      "sceneIds": ["scene-dqn", "scene-train", "scene-compare", "scene-buffer", "scene-concepts", "scene-future"],
-      "sourceIds": ["mnih2015", "schulman2017"]
+      "title": "系统：当 Q 表装不下世界",
+      "summary": "本章回答：DQN 如何用神经网络、回放缓冲区和目标网络，把表格方法扩展到高维状态。",
+      "sceneIds": [
+        "scene-dqn",
+        "scene-train",
+        "scene-compare",
+        "scene-buffer",
+        "scene-concepts",
+        "scene-future"
+      ],
+      "sourceIds": [
+        "mnih2015",
+        "sutton2018",
+        "schulman2017"
+      ],
+      "content": "<p>上一章的 Q 表在小网格世界里很好用，因为状态和动作都能数得清。把问题换成 Atari 游戏，屏幕像素的组合近乎无穷，你不可能为每个画面准备一行表格。DQN（Deep Q-Network）的核心想法很直接：不要存整本手册，训练一个函数去“估计”任何画面下各动作的 Q 值。</p><p>这个想法听起来自然，但直接把神经网络塞进 Q-learning 会不稳定。原因有两个：连续帧高度相关，像连续看同一段视频学开车，容易把偶然模式当规律；目标值又随着网络自己变化，像一边移动靶子一边射击。DQN 用两个工程组件缓解这个问题：<button class=\"concept-link\" data-concept=\"replay-buffer\">回放缓冲区</button> 打乱经验相关性，目标网络让 TD 目标暂时稳定。</p><div data-scene=\"scene-dqn\"></div><div data-scene=\"scene-train\"></div><p>这时再看“探索”就不只是一个小技巧。<button class=\"concept-link\" data-concept=\"exploration\">探索（exploration）</button>决定了缓冲区里会有什么经验；没有足够探索，网络只会反复强化已知路径。学习系统因此变成一个闭环：策略影响数据，数据影响训练，训练又影响策略。理解这个闭环，是理解很多 RL 调参问题的关键。</p><div data-scene=\"scene-compare\"></div><p>上面的对比不是为了评出“谁更强”，而是说明不同方法在优化不同对象。DQN 学价值函数，适合很多离散动作问题；PPO 直接优化策略，在连续控制等场景常见。选方法时，应该先问任务是什么、数据怎么来、稳定性和样本成本哪个更重要。</p><p>下面的缓冲区和概念图，把“系统为什么稳定/不稳定”拆开来看。前者关注数据如何被存储和覆盖，后者把概念之间的依赖关系放在一张图里。</p><div data-scene=\"scene-buffer\"></div><div data-scene=\"scene-concepts\"></div><p>最后，把目光放远一点。DQN 证明了深度网络可以做价值估计，但它不是终点：样本效率、离线学习、安全约束、真实世界部署成本仍是开放问题。理解这些边界，和理解算法本身一样重要。<a href=\"#src-mnih2015\" class=\"source-ref\">[3]</a></p><div data-scene=\"scene-future\"></div><p>如果你想看一个可运行的模块视角，可以打开 <button class=\"concept-link\" data-module=\"dqn-agent\">DQN Agent</button>，把“概念”落到“组件和数据流”上。</p>"
     }
   ],
   "concepts": [
     {
       "id": "mdp",
       "name": "马尔可夫决策过程",
-      "definition": "用状态、动作、转移、奖励和折扣描述序贯决策的形式化框架。",
-      "explanation": "它假设下一步只依赖当前状态，而不是全部历史；这让问题可以用递推的方式求解。",
-      "principles": ["状态必须包含做决策所需的信息", "奖励是即时反馈，回报是折扣累加", "策略决定在每个状态选择什么动作"],
-      "examples": ["网格世界中的位置是状态，上下左右是动作", "机器人关节角度是状态，电机指令是动作"],
-      "relatedConceptIds": ["bellman"],
-      "sourceIds": ["sutton2018"]
+      "definition": "用状态、动作、转移、奖励和折扣描述序贯决策的数学框架。",
+      "explanation": "ELI5：把它想成一款棋盘游戏的规则书。状态是当前棋局，动作是你能走的棋，奖励是这一步的得分，转移是对手或环境的回应。马尔可夫性意味着：只要当前棋局摆在眼前，你不必背下整盘历史，也能决定下一步。技术上，它把复杂决策压缩成“当前状态够用”的假设；这个假设简化了问题，但如果状态设计漏掉关键信息，模型就会学错。",
+      "principles": [
+        "状态应包含决策所需信息，否则马尔可夫假设失效",
+        "奖励是即时反馈，回报是长期累积后的总分",
+        "折扣因子 γ 表示未来奖励在今天值多少"
+      ],
+      "examples": [
+        "网格世界：位置是状态，上下左右是动作，撞墙得 -1，到终点得 +1",
+        "推荐系统：用户近期画像是状态，推荐内容是动作，点击/停留是奖励"
+      ],
+      "relatedConceptIds": [
+        "bellman"
+      ],
+      "sourceIds": [
+        "sutton2018"
+      ]
     },
     {
       "id": "bellman",
       "name": "贝尔曼方程",
-      "definition": "把价值函数写成“即时奖励 + 折扣后的下一状态价值”的递推关系。",
-      "explanation": "它把长期问题拆成一步问题：只要知道下一状态的价值，就能修正当前状态的价值。",
-      "principles": ["价值 = 即时奖励 + 折扣 × 未来价值", "最优价值满足贝尔曼最优方程", "递推让动态规划成为可能"],
-      "examples": ["Q-learning 的目标 r + γ·max Q(s′,a′)", "策略评估中的迭代更新"],
-      "relatedConceptIds": ["mdp", "q-learning"],
-      "sourceIds": ["sutton2018"]
+      "definition": "把当前价值写成“即时奖励 + 折扣后的下一状态价值”的递推关系。",
+      "explanation": "ELI5：评估一条上学路线，不只看今天少走 5 分钟，还要看它是否把你送到一个“以后也好走”的路口。贝尔曼方程就是把“现在的好处”和“未来的好处”写进同一个等式。技术上，它让价值计算可以递推；但它依赖你对下一状态价值的估计，如果估计偏了，偏差也会沿着递推传播。",
+      "principles": [
+        "价值可递推：当前价值依赖下一状态价值",
+        "最优贝尔曼方程取下一步最大价值",
+        "它是动态规划和很多 RL 算法的共同骨架"
+      ],
+      "examples": [
+        "如果 r=1, γ=0.9, 下一状态最大价值 10，则目标是 1 + 0.9×10 = 10",
+        "Q-learning 的 TD 目标就是贝尔曼最优思想的采样版本"
+      ],
+      "relatedConceptIds": [
+        "mdp",
+        "q-learning"
+      ],
+      "sourceIds": [
+        "sutton2018"
+      ]
     },
     {
       "id": "q-learning",
       "name": "Q-learning",
-      "definition": "一种无需环境模型的时序差分控制方法，直接学习状态-动作价值 Q(s,a)。",
-      "explanation": "它用实际观察到的奖励和下一状态的最大 Q 值构造目标，再用学习率把当前 Q 拉向目标。",
-      "principles": ["离策略更新：行为策略和目标策略可以不同", "自举：用估计值更新估计值", "探索与利用需要平衡"],
-      "examples": ["表格型 Q-learning 更新 Q 表", "DQN 用神经网络近似 Q(s,a)"],
-      "relatedConceptIds": ["bellman", "exploration"],
-      "sourceIds": ["watkins1992", "sutton2018"]
+      "definition": "一种不需要环境模型的离策略时序差分控制算法，学习动作价值函数 Q(s,a)。",
+      "explanation": "ELI5：想象你在陌生城市试不同路线。每次走完一段，你给“在这个路口选这条路”打分。分数会根据刚得到的体验和下一个路口的最好前景慢慢调整。久而久之，你不需要城市地图，也能知道哪里该拐弯。技术上，它用 TD 误差更新 Q 表或 Q 函数；边界是表格形式难以扩展到高维状态，且学习过程受探索策略和超参数影响。",
+      "principles": [
+        "用 TD 目标 r + γ max Q(s',a') 更新当前估计",
+        "离策略：学习目标偏贪心，行为可探索",
+        "需要探索，否则估计会困在局部经验里"
+      ],
+      "examples": [
+        "表格 Q-learning：小状态空间直接维护 Q 表",
+        "DQN：用神经网络近似 Q(s,a)，处理高维输入"
+      ],
+      "relatedConceptIds": [
+        "bellman",
+        "exploration"
+      ],
+      "sourceIds": [
+        "watkins1992",
+        "sutton2018"
+      ]
     },
     {
       "id": "replay-buffer",
       "name": "回放缓冲区",
-      "definition": "保存历史转移 (s, a, r, s′)，训练时从中采样 mini-batch 的数据结构。",
-      "explanation": "它打破连续样本之间的相关性，并让一条经验可以被多次使用，从而提高样本效率。",
-      "principles": ["先进先出或按优先级采样", "容量有限，旧数据会被覆盖", "采样批次需要随机化"],
-      "examples": ["DQN 使用均匀采样的回放缓冲区", "优先经验回放按 TD 误差采样"],
-      "relatedConceptIds": ["q-learning"],
-      "sourceIds": ["mnih2015"]
+      "definition": "存储历史转移 (s,a,r,s') 并随机采样 mini-batch 的数据结构。",
+      "explanation": "ELI5：就像复习错题本。你不会只盯着刚做错的一题反复看，而是把很多题混在一起随机抽查。这样学习更稳，也不会被最近的情绪或巧合带偏。技术上，它打破样本时间相关性并提高数据复用；代价是占用内存，且旧数据可能过时，需要容量和采样策略的权衡。",
+      "principles": [
+        "打破连续样本的时间相关性",
+        "让旧经验被重复利用，提高样本效率",
+        "容量有限，新数据会覆盖旧数据"
+      ],
+      "examples": [
+        "DQN 用均匀采样回放缓冲区",
+        "优先经验回放按 TD 误差大小采样（进阶变体）"
+      ],
+      "relatedConceptIds": [
+        "q-learning"
+      ],
+      "sourceIds": [
+        "mnih2015"
+      ]
     },
     {
       "id": "exploration",
       "name": "探索",
-      "definition": "在不确定环境中尝试新动作，以发现可能更好的策略。",
-      "explanation": "如果只选当前估计最好的动作，智能体可能永远错过更优解；探索让估计有机会被修正。",
-      "principles": ["ε-greedy 以概率 ε 随机探索", "探索率通常随训练衰减", "探索不足会导致局部最优"],
-      "examples": ["ε 从 1.0 衰减到 0.1", "汤普森采样用于多臂老虎机"],
-      "relatedConceptIds": ["q-learning"],
-      "sourceIds": ["sutton2018"]
+      "definition": "在不确定环境中尝试非当前最优动作，以发现更好的长期策略。",
+      "explanation": "ELI5：去新城市吃饭，老餐馆稳，但你偶尔也要试新店。只去老店不会踩雷，也可能永远错过更好吃的。探索就是主动付一点“小代价”，换取更好的长期认知。技术上，ε-greedy 是最简单的探索策略；边界是探索太少会早熟收敛，探索太多会浪费交互成本。",
+      "principles": [
+        "ε-greedy：以概率 ε 随机行动",
+        "探索不足会锁死在次优策略",
+        "探索过多会浪费训练预算"
+      ],
+      "examples": [
+        "ε 从 1.0 衰减到 0.1：早期多探索，后期多利用",
+        "训练初期随机探索能填充回放缓冲区"
+      ],
+      "relatedConceptIds": [
+        "q-learning"
+      ],
+      "sourceIds": [
+        "sutton2018"
+      ]
     }
   ],
   "algorithms": [
@@ -112,22 +290,55 @@
       "id": "q-update",
       "name": "Q-learning 更新",
       "problem": "在不知道环境转移概率的情况下，估计每个状态-动作对的长期价值。",
-      "background": "时序差分学习把蒙特卡洛的采样和动态规划的自举结合起来，Q-learning 是其中最具代表性的离策略控制方法。",
-      "principle": "用 r + γ·max Q(s′,a′) 作为目标，把当前 Q(s,a) 向目标移动 α 步。",
-      "prerequisites": ["MDP", "贝尔曼方程"],
-      "formulas": ["<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>←</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>+</mo><mi>α</mi><mo>[</mo><mi>r</mi><mo>+</mo><mi>γ</mi><munder><mo>max</mo><mi>a′</mi></munder><mi>Q</mi><mo>(</mo><mi>s′</mi><mo>,</mo><mi>a′</mi><mo>)</mo><mo>−</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>]</mo></math>"],
+      "background": "它属于时序差分（Temporal-Difference, TD）方法：像蒙特卡洛一样从经验采样，又像动态规划一样用旧估计更新新估计。",
+      "principle": "把 r + γ·max Q(s′,a′) 当作“更可信的目标”，再把当前 Q(s,a) 朝目标移动一小步。步子大小由学习率 α 控制。",
+      "prerequisites": [
+        "MDP",
+        "贝尔曼方程",
+        "TD 误差"
+      ],
+      "formulas": [
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>←</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>+</mo><mi>α</mi><mo>[</mo><mi>r</mi><mo>+</mo><mi>γ</mi><munder><mo>max</mo><msup><mi>a</mi><mo>′</mo></msup></munder><mi>Q</mi><mo>(</mo><msup><mi>s</mi><mo>′</mo></msup><mo>,</mo><msup><mi>a</mi><mo>′</mo></msup><mo>)</mo><mo>−</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>]</mo></math>"
+      ],
       "pseudocode": "for each transition (s, a, r, s2):\n    target = r + gamma * max(Q[s2])\n    Q[s, a] += alpha * (target - Q[s, a])",
       "steps": [
-        { "title": "观察转移", "text": "从环境中得到当前状态、动作、奖励和下一状态。" },
-        { "title": "计算目标", "text": "用下一状态的最大 Q 值构造 TD 目标。" },
-        { "title": "更新当前值", "text": "按学习率把当前 Q 拉向目标。" }
+        {
+          "title": "观察转移",
+          "text": "记录一条经验：在 s 做了 a，得到 r，来到 s2。"
+        },
+        {
+          "title": "计算目标",
+          "text": "用下一状态最优估计构造 TD 目标：target = r + γ·max Q(s2,a′)。"
+        },
+        {
+          "title": "小步修正",
+          "text": "按 α 把旧 Q 值向目标拉近，而不是直接覆盖。"
+        }
       ],
-      "complexity": { "time": "O(|A|) 每次更新", "space": "O(|S|·|A|)" },
-      "advantages": ["不需要环境模型", "实现简单，适合教学和基线", "可以离策略学习"],
-      "limitations": ["表格方法难以扩展到高维状态", "对学习率和探索敏感", "最大化偏差可能高估 Q 值"],
-      "applications": ["网格世界", "推荐系统冷启动", "作为 DQN 的理论基础"],
+      "complexity": {
+        "time": "O(|A|) 每次更新",
+        "space": "O(|S|·|A|)"
+      },
+      "advantages": [
+        "不需要环境模型",
+        "实现简单，适合作为基线",
+        "离策略学习，行为策略可探索"
+      ],
+      "limitations": [
+        "表格法难以扩展到高维状态",
+        "对学习率、探索策略敏感",
+        "max 操作可能带来高估偏差"
+      ],
+      "applications": [
+        "小型离散控制",
+        "教学与基线实验",
+        "DQN 等算法的理论起点"
+      ],
       "relatedAlgorithmIds": [],
-      "sourceIds": ["watkins1992", "sutton2018"]
+      "sourceIds": [
+        "watkins1992",
+        "sutton2018"
+      ]
     }
   ],
   "modules": [
@@ -135,13 +346,35 @@
       "id": "dqn-agent",
       "name": "DQN Agent",
       "responsibility": "用神经网络近似 Q(s,a)，并通过回放缓冲区和目标网络稳定训练。",
-      "inputs": ["当前状态 s", "动作空间大小"],
-      "outputs": ["每个动作的 Q 值", "选中的动作 a"],
-      "components": ["Q 网络", "目标网络", "回放缓冲区", "ε-greedy 策略"],
-      "dependencies": ["深度学习框架", "环境接口"],
-      "executionFlow": ["接收状态并选择动作", "把转移写入回放缓冲区", "采样 mini-batch", "计算 TD 目标并更新 Q 网络", "定期同步目标网络"],
+      "inputs": [
+        "当前状态 s",
+        "动作空间大小"
+      ],
+      "outputs": [
+        "各动作 Q 值",
+        "选中的动作 a"
+      ],
+      "components": [
+        "Q 网络",
+        "目标网络",
+        "回放缓冲区",
+        "ε-greedy 策略"
+      ],
+      "dependencies": [
+        "深度学习框架",
+        "环境接口"
+      ],
+      "executionFlow": [
+        "接收状态并前向计算 Q 值",
+        "用 ε-greedy 选择动作",
+        "把转移写入回放缓冲区",
+        "采样 mini-batch 计算 TD 目标",
+        "更新 Q 网络并定期同步目标网络"
+      ],
       "implementation": "q_values = online_net(state)\naction = epsilon_greedy(q_values)\nnext_q = target_net(next_state).max(dim=1).values\ntarget = reward + gamma * next_q * (1 - done)\nloss = mse(online_net(state)[action], target)",
-      "sourceIds": ["mnih2015"]
+      "sourceIds": [
+        "mnih2015"
+      ]
     }
   ],
   "scenes": [
@@ -149,161 +382,463 @@
       "id": "scene-history",
       "type": "timeline",
       "title": "从动态规划到 DQN",
-      "description": "三个关键节点，展示值函数方法如何一步步走向深度强化学习。",
+      "description": "三次关键跳跃：递推、从经验学习、再到高维感知。",
       "data": {
         "events": [
-          { "date": "1957", "title": "动态规划", "text": "Bellman 把序贯决策写成递推式。", "sourceIds": ["sutton2018"] },
-          { "date": "1989", "title": "Q-learning", "text": "Watkins 提出无需环境模型的离策略控制方法。", "sourceIds": ["watkins1992"] },
-          { "date": "2015", "title": "DQN", "text": "DeepMind 用深度网络和回放缓冲区玩 Atari。", "sourceIds": ["mnih2015"] }
+          {
+            "date": "1957",
+            "title": "动态规划",
+            "text": "Bellman 提出递推视角：长期价值可以拆成当前奖励加未来价值。",
+            "sourceIds": [
+              "sutton2018"
+            ]
+          },
+          {
+            "date": "1989",
+            "title": "Q-learning",
+            "text": "Watkins 提出无需环境模型的离策略控制方法。",
+            "sourceIds": [
+              "watkins1992"
+            ]
+          },
+          {
+            "date": "2015",
+            "title": "DQN",
+            "text": "Mnih 等人结合深度网络、回放缓冲区和目标网络，在 Atari 上取得突破。",
+            "sourceIds": [
+              "mnih2015"
+            ]
+          }
         ]
       },
-      "sourceIds": ["sutton2018"]
+      "sourceIds": [
+        "sutton2018"
+      ]
     },
     {
       "id": "scene-dqn",
       "type": "architecture",
       "title": "DQN 的训练闭环",
-      "description": "数据如何从环境流到网络更新。",
+      "description": "数据如何从环境进入缓冲区，再驱动网络更新。",
       "data": {
         "width": 760,
         "height": 300,
         "nodes": [
-          { "id": "env", "label": "Environment", "x": 30, "y": 40, "w": 160, "h": 56, "group": "external", "detail": "执行动作，返回奖励 r 和下一状态 s′。", "sourceIds": ["mnih2015"] },
-          { "id": "buffer", "label": "Replay Buffer", "x": 290, "y": 40, "w": 160, "h": 56, "group": "data", "detail": "保存历史转移，均匀采样 mini-batch。" },
-          { "id": "qnet", "label": "Q Network", "x": 550, "y": 40, "w": 160, "h": 56, "group": "model", "detail": "输入状态，输出每个动作的 Q 值。" },
-          { "id": "target", "label": "Target Net", "x": 550, "y": 180, "w": 160, "h": 56, "group": "model", "detail": "定期从 Q 网络同步，提供稳定的 TD 目标。" }
+          {
+            "id": "env",
+            "label": "Environment",
+            "x": 30,
+            "y": 40,
+            "w": 160,
+            "h": 56,
+            "group": "external",
+            "detail": "执行动作，返回奖励 r 和下一状态 s′。"
+          },
+          {
+            "id": "buffer",
+            "label": "Replay Buffer",
+            "x": 290,
+            "y": 40,
+            "w": 160,
+            "h": 56,
+            "group": "data",
+            "detail": "保存历史转移，随机采样 mini-batch。"
+          },
+          {
+            "id": "qnet",
+            "label": "Q Network",
+            "x": 550,
+            "y": 40,
+            "w": 160,
+            "h": 56,
+            "group": "model",
+            "detail": "估计当前状态各动作的 Q 值。"
+          },
+          {
+            "id": "target",
+            "label": "Target Net",
+            "x": 550,
+            "y": 180,
+            "w": 160,
+            "h": 56,
+            "group": "model",
+            "detail": "提供相对稳定的 TD 目标。"
+          }
         ],
         "edges": [
-          { "from": "env", "to": "buffer", "label": "transition" },
-          { "from": "buffer", "to": "qnet", "label": "batch" },
-          { "from": "qnet", "to": "target", "label": "同步" },
-          { "from": "target", "to": "qnet", "label": "TD 目标", "dashed": true }
+          {
+            "from": "env",
+            "to": "buffer",
+            "label": "transition"
+          },
+          {
+            "from": "buffer",
+            "to": "qnet",
+            "label": "batch"
+          },
+          {
+            "from": "qnet",
+            "to": "target",
+            "label": "定期同步"
+          },
+          {
+            "from": "target",
+            "to": "qnet",
+            "label": "TD 目标",
+            "dashed": true
+          }
         ]
       },
-      "sourceIds": ["mnih2015"]
+      "sourceIds": [
+        "mnih2015"
+      ]
     },
     {
       "id": "scene-loop",
       "type": "sequence",
       "title": "Agent 与 Environment 的一步交互",
-      "description": "动作、奖励和下一状态如何流动。",
+      "description": "一次经验如何产生，并被用于更新。",
       "data": {
-        "actors": ["Agent", "Environment"],
+        "actors": [
+          "Agent",
+          "Environment"
+        ],
         "messages": [
-          { "from": "Agent", "to": "Environment", "label": "action a_t", "note": "策略网络根据 s_t 选择动作。", "sourceIds": ["sutton2018"] },
-          { "from": "Environment", "to": "Agent", "label": "r_t, s_{t+1}", "note": "环境执行动作并返回反馈。" },
-          { "from": "Agent", "to": "Agent", "label": "计算 TD 目标", "note": "用奖励和下一状态的最大 Q 值构造目标。" }
+          {
+            "from": "Agent",
+            "to": "Environment",
+            "label": "action a_t",
+            "note": "Agent 根据当前估计和探索策略选动作。",
+            "sourceIds": [
+              "sutton2018"
+            ]
+          },
+          {
+            "from": "Environment",
+            "to": "Agent",
+            "label": "r_t, s_{t+1}",
+            "note": "环境反馈即时奖励和下一状态。"
+          },
+          {
+            "from": "Agent",
+            "to": "Agent",
+            "label": "更新 Q(s_t,a_t)",
+            "note": "用 TD 目标修正旧估计。"
+          }
         ]
       },
-      "sourceIds": ["sutton2018"]
+      "sourceIds": [
+        "sutton2018"
+      ]
     },
     {
       "id": "scene-train",
       "type": "process",
       "title": "一次 DQN 更新",
-      "description": "从采样到参数更新的三个步骤。",
+      "description": "从采样到参数更新的三个关键步骤。",
       "data": {
         "steps": [
-          { "title": "采样", "text": "从回放缓冲区取一批 transition。", "state": { "batch_size": "32", "policy": "ε-greedy" }, "sourceIds": ["mnih2015"] },
-          { "title": "计算目标", "text": "用目标网络计算 r + γ·max Q(s′,a′)。", "state": { "gamma": "0.99", "target_update": "每 1000 步" } },
-          { "title": "更新网络", "text": "对当前 Q 与目标 Q 的均方误差求导并更新。", "state": { "loss": "MSE", "optimizer": "Adam" } }
+          {
+            "title": "采样",
+            "text": "从回放缓冲区随机取一批 transition。",
+            "state": {
+              "batch_size": "32",
+              "policy": "ε-greedy"
+            },
+            "sourceIds": [
+              "mnih2015"
+            ]
+          },
+          {
+            "title": "计算目标",
+            "text": "用目标网络计算 r + γ·max Q(s′,a′)。",
+            "state": {
+              "gamma": "0.99",
+              "target": "target net"
+            }
+          },
+          {
+            "title": "更新网络",
+            "text": "最小化当前 Q 与目标 Q 的误差，更新在线网络。",
+            "state": {
+              "loss": "MSE",
+              "optimizer": "Adam"
+            }
+          }
         ]
       },
-      "sourceIds": ["mnih2015"]
+      "sourceIds": [
+        "mnih2015"
+      ]
     },
     {
       "id": "scene-compare",
       "type": "comparison",
       "title": "Q-learning 与 PPO 的取舍",
-      "description": "从数据、稳定性和适用场景比较两类方法。",
+      "description": "同样是强化学习，不同方法优化的对象不同。",
       "data": {
-        "dimensions": ["解决的问题", "核心原理", "样本效率", "适用场景"],
-        "options": [
-          { "name": "Q-learning", "values": ["离散动作价值", "时序差分", "较低", "离散控制"], "highlight": false },
-          { "name": "PPO", "values": ["策略优化", "策略梯度 + 裁剪", "较高", "连续/离散控制"], "highlight": true }
+        "dimensions": [
+          "优化对象",
+          "核心思想",
+          "样本效率",
+          "典型场景"
         ],
-        "note": "对比基于相同任务预算；样本效率是相对量级，不是精确排名。"
+        "options": [
+          {
+            "name": "Q-learning / DQN",
+            "values": [
+              "动作价值 Q(s,a)",
+              "时序差分 + 值函数近似",
+              "中等偏低",
+              "离散动作控制"
+            ],
+            "highlight": false
+          },
+          {
+            "name": "PPO",
+            "values": [
+              "策略 π(a|s)",
+              "策略梯度 + 裁剪稳定更新",
+              "通常更高",
+              "连续或离散控制"
+            ],
+            "highlight": true
+          }
+        ],
+        "note": "比较的是典型使用场景；实际表现受任务、实现和调参影响。"
       },
-      "sourceIds": ["sutton2018", "schulman2017"]
+      "sourceIds": [
+        "sutton2018",
+        "schulman2017"
+      ]
     },
     {
       "id": "scene-q-update",
       "type": "algorithm",
       "title": "一次 Q-learning 更新",
-      "description": "α=0.1，γ=0.9，观察 Q 值如何变化。",
+      "description": "α=0.1，γ=0.9，观察一个 Q 值如何被修正。",
       "data": {
-        "formula": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>←</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>+</mo><mi>α</mi><mo>[</mo><mi>r</mi><mo>+</mo><mi>γ</mi><munder><mo>max</mo><mi>a′</mi></munder><mi>Q</mi><mo>(</mo><mi>s′</mi><mo>,</mo><mi>a′</mi><mo>)</mo><mo>−</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>]</mo></math>",
-        "columns": ["步骤", "状态 s", "动作 a", "奖励 r", "max Q(s′)", "Q(s,a) 更新"],
-        "rows": [
-          ["1", "s1", "右", "-1", "10.0", "0.00 → 0.90"],
-          ["2", "s2", "下", "0", "10.0", "0.00 → 0.90"],
-          ["3", "s4", "右", "1", "10.0", "0.00 → 1.90"]
+        "formula": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>←</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>+</mo><mi>α</mi><mo>[</mo><mi>r</mi><mo>+</mo><mi>γ</mi><munder><mo>max</mo><msup><mi>a</mi><mo>′</mo></msup></munder><mi>Q</mi><mo>(</mo><msup><mi>s</mi><mo>′</mo></msup><mo>,</mo><msup><mi>a</mi><mo>′</mo></msup><mo>)</mo><mo>−</mo><mi>Q</mi><mo>(</mo><mi>s</mi><mo>,</mo><mi>a</mi><mo>)</mo><mo>]</mo></math>",
+        "columns": [
+          "步骤",
+          "状态 s",
+          "动作 a",
+          "奖励 r",
+          "max Q(s′)",
+          "Q(s,a) 更新"
         ],
-        "note": "目标 = r + γ·max Q(s′)；更新量 = α·(目标 − 当前 Q)。"
+        "rows": [
+          [
+            "1",
+            "s1",
+            "右",
+            "-1",
+            "10.0",
+            "0.00 → 0.80"
+          ],
+          [
+            "2",
+            "s2",
+            "下",
+            "0",
+            "10.0",
+            "0.00 → 0.90"
+          ],
+          [
+            "3",
+            "s4",
+            "右",
+            "1",
+            "10.0",
+            "0.00 → 1.00"
+          ]
+        ],
+        "note": "目标 = r + γ·max Q(s′)；更新量 = α·(目标 − 当前 Q)。读表时先算目标，再看旧值被拉动了多少。"
       },
-      "sourceIds": ["watkins1992"]
+      "sourceIds": [
+        "watkins1992"
+      ]
     },
     {
       "id": "scene-buffer",
       "type": "data-structure",
-      "title": "环形缓冲区的写入",
-      "description": "容量为 6，观察指针移动和覆盖。",
+      "title": "回放缓冲区的覆盖",
+      "description": "容量有限时，新经验如何覆盖旧经验。",
       "data": {
         "items": [
-          { "label": "0", "value": "t1" },
-          { "label": "1", "value": "t2" },
-          { "label": "2", "value": "t3" },
-          { "label": "3", "value": "—" },
-          { "label": "4", "value": "—" },
-          { "label": "5", "value": "—" }
+          {
+            "label": "0",
+            "value": "t1"
+          },
+          {
+            "label": "1",
+            "value": "t2"
+          },
+          {
+            "label": "2",
+            "value": "t3"
+          },
+          {
+            "label": "3",
+            "value": "—"
+          },
+          {
+            "label": "4",
+            "value": "—"
+          },
+          {
+            "label": "5",
+            "value": "—"
+          }
         ],
         "steps": [
-          { "title": "初始状态", "text": "缓冲区已写入 3 条 transition。", "highlight": [0, 1, 2] },
-          { "title": "写入 t4", "text": "指针移动到下标 3，写入 t4。", "highlight": [3] },
-          { "title": "写入 t7", "text": "缓冲区满后覆盖最旧的数据。", "highlight": [0] }
+          {
+            "title": "初始",
+            "text": "已写入 3 条经验，后面为空。",
+            "highlight": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "title": "写入 t4",
+            "text": "写入下一个空位。",
+            "highlight": [
+              3
+            ]
+          },
+          {
+            "title": "覆盖旧数据",
+            "text": "缓冲区满后，新数据覆盖最旧位置。",
+            "highlight": [
+              0
+            ]
+          }
         ]
       },
-      "sourceIds": ["mnih2015"]
+      "sourceIds": [
+        "mnih2015"
+      ]
     },
     {
       "id": "scene-concepts",
       "type": "concept",
-      "title": "强化学习的核心概念",
-      "description": "实体、学习对象和它们的关系。",
+      "title": "核心概念关系",
+      "description": "这些概念如何拼成 Q-learning/DQN 的全景。",
       "data": {
         "groups": [
-          { "name": "基础", "concepts": ["mdp", "bellman"] },
-          { "name": "方法", "concepts": ["q-learning", "exploration"] },
-          { "name": "系统", "concepts": ["replay-buffer"] }
+          {
+            "name": "问题建模",
+            "concepts": [
+              "mdp",
+              "bellman"
+            ]
+          },
+          {
+            "name": "学习方法",
+            "concepts": [
+              "q-learning",
+              "exploration"
+            ]
+          },
+          {
+            "name": "系统稳定",
+            "concepts": [
+              "replay-buffer"
+            ]
+          }
         ],
         "edges": [
-          { "from": "bellman", "to": "q-learning", "label": "目标" },
-          { "from": "q-learning", "to": "exploration", "label": "需要" },
-          { "from": "replay-buffer", "to": "q-learning", "label": "采样" }
+          {
+            "from": "bellman",
+            "to": "q-learning",
+            "label": "提供目标"
+          },
+          {
+            "from": "q-learning",
+            "to": "exploration",
+            "label": "需要数据"
+          },
+          {
+            "from": "replay-buffer",
+            "to": "q-learning",
+            "label": "稳定训练"
+          }
         ]
       },
-      "sourceIds": ["sutton2018"]
+      "sourceIds": [
+        "sutton2018"
+      ]
     },
     {
       "id": "scene-future",
       "type": "future-scenario",
-      "title": "强化学习的三个方向",
-      "description": "区分已发生、进行中和推测。",
+      "title": "强化学习的下一步",
+      "description": "区分已发生、趋势和推测。",
       "data": {
         "branches": [
-          { "title": "深度强化学习成为标准工具", "status": "fact", "text": "深度网络与强化学习结合，已经在游戏和控制任务中取得结果。", "evidence": "DQN 在 Atari 上的结果开启了这一路线。", "sourceIds": ["mnih2015"] },
-          { "title": "离线强化学习", "status": "trend", "text": "从固定数据集中学习策略，减少在线交互。", "evidence": "多个基准和工业实践正在出现。", "sourceIds": ["levine2020"] },
-          { "title": "通用智能体", "status": "speculation", "text": "用统一策略处理多任务、多环境。", "evidence": "目前缺乏统一证据，更多是研究方向。", "sourceIds": [] }
+          {
+            "title": "深度 RL 在游戏/控制中成熟",
+            "status": "fact",
+            "text": "DQN 等方法已在 Atari 等任务证明深度网络可用于价值估计。",
+            "evidence": "Mnih et al. 2015 的 Atari 结果。",
+            "sourceIds": [
+              "mnih2015"
+            ]
+          },
+          {
+            "title": "离线强化学习",
+            "status": "trend",
+            "text": "从固定数据集学习策略，减少昂贵或危险的在线交互。",
+            "evidence": "Levine et al. 2020 综述了离线 RL 的问题与进展。",
+            "sourceIds": [
+              "levine2020"
+            ]
+          },
+          {
+            "title": "通用智能体",
+            "status": "speculation",
+            "text": "一个策略跨多任务、多环境泛化。",
+            "evidence": "方向活跃，但缺乏统一的“已解决”证据。",
+            "sourceIds": []
+          }
         ]
       },
-      "sourceIds": ["sutton2018"]
+      "sourceIds": [
+        "sutton2018"
+      ]
     }
   ],
   "crossReferences": [
-    { "id": "xref-bellman-q", "sourceId": "bellman", "targetId": "q-update", "type": "depends-on", "description": "Q-learning 的更新目标来自贝尔曼最优方程。" },
-    { "id": "xref-q-mdp", "sourceId": "q-update", "targetId": "mdp", "type": "related-to", "description": "Q-learning 解决的问题是 MDP 中的控制问题。" },
-    { "id": "xref-dqn-q", "sourceId": "dqn-agent", "targetId": "q-update", "type": "implements", "description": "DQN 用神经网络实现 Q-learning 的更新目标。" },
-    { "id": "xref-buffer-dqn", "sourceId": "replay-buffer", "targetId": "dqn-agent", "type": "related-to", "description": "回放缓冲区是 DQN 训练闭环的数据组件。" }
+    {
+      "id": "xr1",
+      "sourceId": "bellman",
+      "targetId": "q-update",
+      "type": "related-to",
+      "description": "Q-learning 的 TD 目标来自贝尔曼最优思想。"
+    },
+    {
+      "id": "xr2",
+      "sourceId": "q-update",
+      "targetId": "mdp",
+      "type": "depends-on",
+      "description": "更新定义在 MDP 的状态-动作-奖励转移上。"
+    },
+    {
+      "id": "xr3",
+      "sourceId": "dqn-agent",
+      "targetId": "q-update",
+      "type": "implements",
+      "description": "DQN 用神经网络近似并训练 Q 更新目标。"
+    },
+    {
+      "id": "xr4",
+      "sourceId": "replay-buffer",
+      "targetId": "dqn-agent",
+      "type": "related-to",
+      "description": "回放缓冲区是 DQN 稳定训练的关键组件。"
+    }
   ],
   "sources": [
     {
@@ -315,7 +850,7 @@
       "author": "Richard S. Sutton, Andrew G. Barto",
       "publishedAt": "2018",
       "accessedAt": "2026-11-26",
-      "evidenceDescription": "第 6 章给出 TD 与 Q-learning 的标准表述。"
+      "evidenceDescription": "RL、MDP、Bellman、Q-learning、探索利用的标准教材。"
     },
     {
       "id": "watkins1992",
@@ -324,7 +859,7 @@
       "author": "Christopher J. C. H. Watkins, Peter Dayan",
       "publishedAt": "1992",
       "accessedAt": "2026-11-26",
-      "evidenceDescription": "Q-learning 的原始论文，给出收敛条件和更新规则。"
+      "evidenceDescription": "Q-learning 原始论文，给出更新规则与收敛讨论。"
     },
     {
       "id": "mnih2015",
@@ -334,7 +869,7 @@
       "author": "Volodymyr Mnih et al.",
       "publishedAt": "2015",
       "accessedAt": "2026-11-26",
-      "evidenceDescription": "DQN 论文，描述回放缓冲区和目标网络。"
+      "evidenceDescription": "DQN：经验回放、目标网络与 Atari 实验。"
     },
     {
       "id": "schulman2017",
@@ -343,7 +878,7 @@
       "author": "John Schulman et al.",
       "publishedAt": "2017",
       "accessedAt": "2026-11-26",
-      "evidenceDescription": "PPO 的裁剪目标与训练流程。"
+      "evidenceDescription": "PPO 的裁剪目标，用于策略优化方法对比。"
     },
     {
       "id": "levine2020",
@@ -352,39 +887,64 @@
       "author": "Sergey Levine et al.",
       "publishedAt": "2020",
       "accessedAt": "2026-11-26",
-      "evidenceDescription": "离线强化学习的问题设定与开放问题综述。"
+      "evidenceDescription": "离线 RL 的综述与开放问题。"
     }
   ],
   "quiz": [
     {
-      "question": "Q-learning 的更新目标是什么？",
-      "options": ["当前 Q 值", "即时奖励加下一状态最大 Q 值", "整个回合的总奖励", "下一状态的平均 Q 值"],
+      "question": "为什么 Q-learning 的更新里要有学习率 α？",
+      "options": [
+        "为了让奖励变大",
+        "为了避免一次经验完全覆盖旧估计",
+        "为了替代折扣因子 γ",
+        "为了让 Q 表变小"
+      ],
       "answer": 1,
-      "explanation": "目标是 r + γ·max Q(s′,a′)，再乘以学习率去修正当前 Q。"
+      "explanation": "α 控制更新步长。步子太大容易被噪声带跑，步子太小学习慢；它让新证据逐步修正旧估计。"
     },
     {
-      "question": "为什么需要探索？",
-      "options": ["让训练速度变慢", "避免只利用当前估计而错过更优动作", "减少环境交互", "让奖励变大"],
+      "question": "贝尔曼方程的核心直觉是什么？",
+      "options": [
+        "未来与现在无关",
+        "当前价值等于即时奖励加折扣后的未来价值",
+        "只要最大化即时奖励",
+        "价值只能通过神经网络估计"
+      ],
       "answer": 1,
-      "explanation": "只选当前估计最好的动作可能陷入局部最优；探索让估计有机会被修正。"
+      "explanation": "它把长期回报拆成递推形式：现在的价值包含眼前奖励，也包含下一步状态的价值。"
     },
     {
-      "question": "回放缓冲区的主要作用是什么？",
-      "options": ["存储环境模型", "打破样本相关性并复用经验", "直接输出动作", "替代奖励函数"],
+      "question": "回放缓冲区主要解决什么问题？",
+      "options": [
+        "让环境更简单",
+        "打破连续经验相关性并复用样本",
+        "替代目标网络",
+        "消除探索需求"
+      ],
       "answer": 1,
-      "explanation": "回放缓冲区保存历史转移，训练时随机采样，既降低相关性又提高样本效率。"
+      "explanation": "连续样本相关性强，会让神经网络训练不稳定；随机采样回放能缓解这个问题并提高样本利用率。"
     },
     {
-      "question": "贝尔曼方程把回报拆成了什么？",
-      "options": ["即时奖励和折扣后的未来价值", "动作和状态", "策略和值函数", "探索和利用"],
-      "answer": 0,
-      "explanation": "贝尔曼方程用“即时奖励 + 折扣 × 下一状态价值”表示长期回报。"
+      "question": "Q-learning 为什么常被称为离策略（off-policy）？",
+      "options": [
+        "它不需要奖励",
+        "它学习的目标使用 max Q，而行为可以包含探索",
+        "它不能用于离散动作",
+        "它不更新 Q 表"
+      ],
+      "answer": 1,
+      "explanation": "行为策略可以 ε-greedy 探索，但更新目标使用下一状态最大 Q 值，对应更贪心的目标策略。"
     },
     {
       "question": "DQN 中目标网络的作用是什么？",
-      "options": ["增加探索", "提供更稳定的 TD 目标", "存储回放数据", "替代 Q 网络"],
+      "options": [
+        "增加探索",
+        "提供相对稳定的 TD 目标",
+        "存储历史经验",
+        "生成环境奖励"
+      ],
       "answer": 1,
-      "explanation": "目标网络定期同步，避免目标随当前网络每步变化，从而稳定训练。"
+      "explanation": "如果目标和在线网络同步变化太快，训练会像追移动靶。目标网络定期同步，降低目标抖动。"
     }
   ]
 }
