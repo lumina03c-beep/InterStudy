@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="__LANG__" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>__TITLE__</title>
+  <style>/*__STYLES__*/</style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+
+  <header class="topbar">
+    <button class="icon-btn nav-toggle" id="navToggle" type="button" aria-label="打开知识树" aria-expanded="false">☰</button>
+    <div class="topbar-title">
+      <span class="brand">InterStudy</span>
+      <span class="topic-title" id="topicTitle"></span>
+      <span class="chapter-indicator" id="chapterIndicator"></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="切换深色模式">◐</button>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="知识树">
+      <div class="sidebar-head">
+        <div class="sidebar-kicker">知识地图</div>
+        <label class="search-wrap">
+          <span class="visually-hidden">搜索知识树</span>
+          <input id="treeSearch" class="tree-search" type="search" placeholder="搜索节点…" autocomplete="off">
+        </label>
+      </div>
+      <nav id="tree" class="tree" aria-label="知识树导航"></nav>
+      <div class="sidebar-foot" id="sidebarFoot"></div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+    <main class="main" id="main">
+      <section class="hero" id="hero">
+        <p class="eyebrow" id="heroEyebrow">交互式技术学习</p>
+        <h1 id="heroTitle"></h1>
+        <p class="lede" id="heroLede"></p>
+        <div class="hero-meta" id="heroMeta"></div>
+      </section>
+
+      <div id="chapters"></div>
+
+      <section class="chapter quiz-section" id="quiz" data-chapter="quiz">
+        <div class="chapter-head">
+          <div class="chapter-kicker">测验</div>
+          <h2>检查你的理解</h2>
+        </div>
+        <p class="chapter-summary">五道中等难度的问题。选择后立即看到反馈。</p>
+        <div id="quizRoot"></div>
+      </section>
+
+      <section class="chapter sources-section" id="sources" data-chapter="sources">
+        <div class="chapter-head">
+          <div class="chapter-kicker">参考</div>
+          <h2>来源与证据</h2>
+        </div>
+        <p class="chapter-summary">关键结论的来源。链接在新标签页打开。</p>
+        <div id="sourcesRoot"></div>
+      </section>
+
+      <footer class="page-footer" id="pageFooter"></footer>
+    </main>
+  </div>
+
+  <div class="modal" id="conceptModal" hidden>
+    <div class="modal-backdrop" data-close="concept"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="conceptTitle">
+      <div class="modal-head">
+        <div>
+          <div class="kicker">概念</div>
+          <h2 id="conceptTitle"></h2>
+        </div>
+        <button class="icon-btn" type="button" data-close="concept" aria-label="关闭概念弹窗">×</button>
+      </div>
+      <div class="modal-body" id="conceptBody"></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail" hidden>
+    <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="detail-head">
+        <button class="icon-btn" id="detailBack" type="button" aria-label="返回正文">←</button>
+        <div class="detail-heading">
+          <div class="kicker" id="detailKicker"></div>
+          <h2 id="detailTitle"></h2>
+        </div>
+        <button class="icon-btn" id="detailClose" type="button" aria-label="关闭深入视图">×</button>
+      </div>
+      <div class="detail-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    window.TOPIC = /*__TOPIC__*/;
+    /*__ENGINE__*/
+  </script>
+</body>
+</html>

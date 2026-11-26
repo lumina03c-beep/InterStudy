@@ -1,0 +1,3013 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Q-learning 的一次真实更新</title>
+  <style>:root {
+  --bg: #fbfbf8;
+  --bg-elev: #ffffff;
+  --panel: #ffffff;
+  --panel-soft: #f5f5f0;
+  --text: #1f2328;
+  --text-soft: #46505a;
+  --muted: #6b7280;
+  --border: #e3e3dc;
+  --border-strong: #c9c9c0;
+  --accent: #0f766e;
+  --accent-soft: #e6f4f1;
+  --code-bg: #f2f3ee;
+  --success: #15803d;
+  --success-soft: #e9f7ee;
+  --danger: #b91c1c;
+  --danger-soft: #fdecec;
+  --warning: #b45309;
+  --warning-soft: #fdf3e3;
+  --info: #1d4ed8;
+  --info-soft: #e8efff;
+  --purple: #6d28d9;
+  --purple-soft: #f1eaff;
+  --tok-key: #9f1239;
+  --tok-str: #166534;
+  --tok-num: #1d4ed8;
+  --tok-com: #6b7280;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 32px rgba(0, 0, 0, .05);
+  --radius: 10px;
+  --topbar: 56px;
+  --sidebar: 292px;
+  --content: 860px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Georgia, "Songti SC", serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html[data-theme="dark"] {
+  --bg: #0f1214;
+  --bg-elev: #151a1d;
+  --panel: #161b1f;
+  --panel-soft: #1b2126;
+  --text: #e6e8ea;
+  --text-soft: #b8c0c7;
+  --muted: #8b969f;
+  --border: #2a3137;
+  --border-strong: #3b444c;
+  --accent: #5eead4;
+  --accent-soft: #12332f;
+  --code-bg: #101518;
+  --success: #4ade80;
+  --success-soft: #11291a;
+  --danger: #f87171;
+  --danger-soft: #321417;
+  --warning: #fbbf24;
+  --warning-soft: #33240b;
+  --info: #93c5fd;
+  --info-soft: #12213a;
+  --purple: #c4b5fd;
+  --purple-soft: #241b3a;
+  --tok-key: #fda4af;
+  --tok-str: #86efac;
+  --tok-num: #93c5fd;
+  --tok-com: #8b969f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--topbar) + 14px);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+body.locked { overflow: hidden; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+[hidden] { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 300;
+  padding: 8px 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.skip-link:focus { left: 8px; }
+
+/* 顶栏 */
+.topbar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--topbar);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  background: var(--bg-elev);
+  background: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.topbar-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.topic-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chapter-indicator {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions { display: flex; gap: 6px; }
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text-soft);
+  font-size: 16px;
+  line-height: 1;
+  flex: none;
+}
+.icon-btn:hover { background: var(--panel-soft); color: var(--text); }
+
+.nav-toggle { display: none; }
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: transparent;
+}
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width .12s linear;
+}
+
+/* 布局 */
+.layout {
+  display: flex;
+  min-height: 100vh;
+  padding-top: var(--topbar);
+}
+
+.sidebar {
+  position: fixed;
+  top: var(--topbar);
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-head { padding: 18px 16px 10px; }
+
+.sidebar-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-wrap { display: block; margin-top: 10px; }
+
+.tree-search {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.tree-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.tree {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px 20px;
+  overscroll-behavior: contain;
+}
+
+.tree ul { list-style: none; margin: 0; padding: 0; }
+.tree-children {
+  margin-left: 9px;
+  padding-left: 2px;
+  border-left: 1px solid var(--border);
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  color: var(--text-soft);
+  font-size: 13.5px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.tree-row:hover { background: var(--panel-soft); }
+.tree-row.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 650;
+}
+.tree-row.match .tree-title { background: var(--warning-soft); border-radius: 3px; }
+
+.tree-title {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.tree-toggle {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform .15s ease;
+}
+.tree-toggle.open { transform: rotate(90deg); }
+.tree-toggle:hover { background: var(--border); color: var(--text); }
+.tree-spacer { width: 18px; flex: none; }
+
+.tree-badge {
+  width: 19px;
+  height: 19px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.type-topic .tree-badge { color: var(--accent); border-color: var(--accent); }
+.type-concept .tree-badge { color: var(--info); background: var(--info-soft); }
+.type-algorithm .tree-badge { color: var(--warning); background: var(--warning-soft); }
+.type-module .tree-badge,
+.type-component .tree-badge { color: var(--purple); background: var(--purple-soft); }
+.type-process .tree-badge { color: var(--success); background: var(--success-soft); }
+
+.sidebar-foot {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: var(--topbar) 0 0 0;
+  z-index: 35;
+  background: rgba(0, 0, 0, .35);
+}
+
+/* 正文 */
+.main {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sidebar);
+  padding: 0 32px 80px;
+}
+
+.hero {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 54px 0 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0 0 14px;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1.14;
+  letter-spacing: -.02em;
+  font-weight: 750;
+}
+
+.lede {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.meta-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chapter {
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 48px 0 10px;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: calc(var(--topbar) + 14px);
+}
+.chapter:last-of-type { border-bottom: 0; }
+
+.chapter-head { margin-bottom: 14px; }
+
+.chapter-kicker {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.chapter h2 {
+  margin: 0 0 10px;
+  font-size: clamp(24px, 3vw, 32px);
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+
+.chapter-summary {
+  max-width: 70ch;
+  margin: 0 0 22px;
+  color: var(--text-soft);
+  font-size: 16px;
+}
+
+.chapter p,
+.chapter li { font-size: 16.5px; line-height: 1.78; }
+
+.chapter h3 { margin: 34px 0 10px; font-size: 20px; line-height: 1.35; }
+.chapter h4 { margin: 24px 0 8px; font-size: 17px; }
+
+.chapter ul,
+.chapter ol { margin: 12px 0; padding-left: 1.4em; }
+.chapter li { margin: 4px 0; }
+
+.chapter blockquote {
+  margin: 20px 0;
+  padding: 12px 18px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+}
+
+.chapter code,
+.detail-body code {
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: .9em;
+}
+
+.chapter pre,
+.detail-body pre {
+  position: relative;
+  margin: 18px 0;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  line-height: 1.55;
+}
+
+.chapter pre code,
+.detail-body pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13.5px;
+  white-space: pre;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  color: var(--muted);
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+pre:hover .copy-btn,
+.copy-btn:focus { opacity: 1; }
+
+.table-wrap {
+  margin: 18px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.table-wrap table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.table-wrap th,
+.table-wrap td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-wrap th {
+  background: var(--panel-soft);
+  color: var(--text);
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.table-wrap tr:last-child td { border-bottom: 0; }
+
+.source-ref {
+  font-size: 11px;
+  vertical-align: super;
+  line-height: 0;
+  margin-left: 1px;
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.source-chip:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+.chapter-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.chapter-sources .label { margin-right: 2px; color: var(--text-soft); font-weight: 650; }
+
+.concept-link,
+.detail-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.concept-link:hover,
+.detail-link:hover { text-decoration-style: solid; }
+
+.callout {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-soft);
+}
+
+/* 场景 */
+.scene {
+  margin: 28px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elev);
+}
+
+.scene-head {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scene-kicker {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.scene h3 { margin: 0 0 4px; font-size: 17px; line-height: 1.35; }
+
+.scene-desc { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+
+.scene-body { padding: 18px; }
+
+.scene-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 18px 14px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.scene-empty {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 时间线 */
+.timeline {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 22px;
+  list-style: none;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--border);
+}
+.timeline li { position: relative; padding: 0 0 20px 8px; }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg-elev);
+}
+.timeline-date { color: var(--accent); font-size: 12px; font-weight: 750; letter-spacing: .04em; }
+.timeline-title { margin: 2px 0; font-weight: 650; }
+.timeline-text { margin: 0; color: var(--text-soft); font-size: 14px; line-height: 1.65; }
+.timeline li.active .timeline-title { color: var(--accent); }
+.timeline li.active::before { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* 图 */
+.graph-wrap { overflow-x: auto; }
+
+.scene-graph { display: block; width: 100%; height: auto; }
+
+.scene-graph .node { cursor: pointer; }
+.scene-graph .node rect {
+  fill: var(--panel);
+  stroke: var(--border-strong);
+  stroke-width: 1.2;
+  rx: 8;
+}
+.scene-graph .node:hover rect { stroke: var(--accent); }
+.scene-graph .node.active rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.2; }
+.scene-graph .node text {
+  fill: var(--text);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 650;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+}
+.scene-graph .node[data-group="external"] rect { fill: var(--panel-soft); }
+.scene-graph .node[data-group="model"] rect { fill: var(--info-soft); }
+.scene-graph .node[data-group="data"] rect { fill: var(--warning-soft); }
+
+.scene-graph .edge line { stroke: var(--border-strong); stroke-width: 1.4; }
+.scene-graph .edge.dashed line { stroke-dasharray: 5 4; }
+.scene-graph .edge.active line { stroke: var(--accent); stroke-width: 2.2; }
+.scene-graph .edge text {
+  fill: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg-elev);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.scene-graph .edge.active text { fill: var(--accent); font-weight: 700; }
+.scene-graph .arrow { fill: var(--border-strong); }
+.scene-graph .edge.active .arrow { fill: var(--accent); }
+
+.scene-detail {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.scene-detail strong { color: var(--text); }
+
+/* 时序图 */
+.sequence-wrap { overflow-x: auto; }
+.sequence-svg { display: block; width: 100%; height: auto; }
+.sequence-actor rect { fill: var(--panel-soft); stroke: var(--border-strong); rx: 7; }
+.sequence-actor text { fill: var(--text); font-family: var(--font-sans); font-size: 12px; font-weight: 650; text-anchor: middle; dominant-baseline: middle; }
+.sequence-lifeline { stroke: var(--border); stroke-width: 1.2; stroke-dasharray: 4 5; }
+.sequence-message line,
+.sequence-message path { stroke: var(--border-strong); stroke-width: 1.4; }
+.sequence-message.active line,
+.sequence-message.active path { stroke: var(--accent); stroke-width: 2.2; }
+.sequence-message.dim { opacity: .28; }
+.sequence-message text { fill: var(--muted); font-family: var(--font-sans); font-size: 11px; text-anchor: middle; paint-order: stroke; stroke: var(--bg-elev); stroke-width: 4px; }
+.sequence-message.active text { fill: var(--accent); font-weight: 700; }
+.sequence-message .arrow { fill: var(--border-strong); }
+.sequence-message.active .arrow { fill: var(--accent); }
+
+/* 步骤控制 */
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.stepper button {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.stepper button:hover { border-color: var(--accent); color: var(--accent); }
+.stepper button:disabled { opacity: .4; cursor: not-allowed; }
+.stepper button.primary { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.step-label { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* 流程图 */
+.process-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.process-step {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.process-step:hover { border-color: var(--accent); }
+.process-step.active { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.process-step .num { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .08em; }
+.process-step .t { font-size: 13.5px; font-weight: 650; line-height: 1.4; }
+
+.step-detail {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.step-detail strong { color: var(--text); }
+
+.state-table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 12.5px; }
+.state-table th,
+.state-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.state-table th { width: 40%; color: var(--muted); font-weight: 600; }
+.state-table tr:last-child th,
+.state-table tr:last-child td { border-bottom: 0; }
+
+/* 对比 */
+.comparison-table { min-width: 640px; }
+.comparison-table th:first-child,
+.comparison-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel-soft);
+  font-weight: 650;
+}
+.comparison-table td.highlight-col { background: var(--accent-soft); }
+.comparison-table th.highlight-col { background: var(--accent-soft); color: var(--accent); }
+.option-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.scene-note { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+/* 算法表 */
+.formula {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  text-align: center;
+}
+.formula math { font-size: 1.12em; }
+
+.algo-table-wrap {
+  max-height: 380px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.algo-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13.5px; }
+.algo-table th,
+.algo-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.algo-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.algo-table tr.active td { background: var(--accent-soft); }
+.algo-table tr:last-child td { border-bottom: 0; }
+
+/* 数据结构 */
+.ds-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.ds-cell {
+  min-width: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: center;
+}
+.ds-cell.active { border-color: var(--accent); background: var(--accent-soft); }
+.ds-label { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.ds-value { font-family: var(--font-mono); font-size: 13px; font-weight: 650; }
+
+/* 概念图 */
+.concept-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.concept-group { padding: 12px; border: 1px solid var(--border); border-radius: 9px; }
+.concept-group h4 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.concept-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.concept-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.concept-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.relation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.relation-list .arrow { margin: 0 6px; color: var(--muted); }
+
+/* 未来 */
+.future-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.future-card { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.status-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.status-fact { background: var(--success-soft); color: var(--success); }
+.status-trend { background: var(--warning-soft); color: var(--warning); }
+.status-speculation { background: var(--purple-soft); color: var(--purple); }
+.future-card h4 { margin: 8px 0 6px; font-size: 15px; line-height: 1.4; }
+.future-card p { margin: 0 0 8px; color: var(--text-soft); font-size: 13.5px; line-height: 1.6; }
+.future-evidence {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.future-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+
+/* 测验 */
+.quiz-card {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elev);
+}
+.quiz-q { margin: 0 0 12px; font-size: 16px; font-weight: 650; line-height: 1.5; }
+.quiz-options { display: grid; gap: 8px; }
+.quiz-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 14.5px;
+  line-height: 1.55;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+.quiz-option:hover:not(:disabled) { border-color: var(--accent); }
+.quiz-option .key { flex: none; color: var(--muted); font-weight: 750; }
+.quiz-option.correct { border-color: var(--success); background: var(--success-soft); color: var(--text); }
+.quiz-option.wrong { border-color: var(--danger); background: var(--danger-soft); color: var(--text); }
+.quiz-option:disabled { cursor: default; }
+.quiz-explanation {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.quiz-score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.quiz-score strong { color: var(--text); }
+.quiz-reset {
+  margin-left: auto;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+.quiz-reset:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 来源 */
+.source-list { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.source-item {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  scroll-margin-top: calc(var(--topbar) + 16px);
+}
+.source-item:target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.source-title { font-size: 14.5px; font-weight: 650; line-height: 1.45; }
+.source-meta { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.source-evidence { margin-top: 6px; color: var(--text-soft); font-size: 13px; line-height: 1.6; }
+
+.page-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: 28px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 弹窗 */
+.modal,
+.detail {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal { z-index: 110; }
+.detail { z-index: 100; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 14, .45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-panel {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(82vh, 900px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elev);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .25);
+}
+
+.modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.modal-head h2 { margin: 2px 0 0; font-size: 22px; line-height: 1.25; }
+
+.kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.modal-body { padding: 18px 20px 26px; }
+
+.detail {
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: rgba(10, 12, 14, .38);
+}
+
+.detail-panel {
+  width: min(920px, 100%);
+  height: 100%;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, .18);
+}
+
+.detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.detail-heading { flex: 1; min-width: 0; }
+.detail-heading h2 { margin: 2px 0 0; font-size: 20px; line-height: 1.3; }
+
+.detail-body { max-width: 820px; padding: 24px 28px 60px; }
+
+.detail-section { margin: 24px 0; }
+.detail-section h3 { margin: 0 0 8px; font-size: 16px; letter-spacing: .01em; }
+.detail-section p,
+.detail-section li { color: var(--text-soft); font-size: 15px; line-height: 1.75; }
+.detail-section ul,
+.detail-section ol { margin: 8px 0; padding-left: 1.3em; }
+.detail-section .formula { text-align: left; }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.empty { color: var(--muted); font-size: 13px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 200;
+  transform: translateX(-50%);
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  box-shadow: var(--shadow);
+}
+
+/* MathML */
+math { font-size: 1.05em; }
+math[display="block"] { display: block; margin: 14px auto; text-align: center; }
+
+/* 代码高亮 */
+.tok-key { color: var(--tok-key); }
+.tok-str { color: var(--tok-str); }
+.tok-num { color: var(--tok-num); }
+.tok-com { color: var(--tok-com); font-style: italic; }
+
+/* 响应式 */
+@media (max-width: 1100px) {
+  :root { --sidebar: 260px; }
+  .main { padding: 0 24px 60px; }
+}
+
+@media (max-width: 900px) {
+  .nav-toggle { display: grid; }
+  .sidebar {
+    width: min(320px, 86vw);
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    box-shadow: 18px 0 50px rgba(0, 0, 0, .18);
+  }
+  body.nav-open .sidebar { transform: none; }
+  .main { margin-left: 0; padding: 0 18px 56px; }
+  .topbar-title .brand { display: none; }
+  .hero { padding-top: 36px; }
+  .detail-panel { width: 100%; }
+  .modal { padding: 12px; }
+}
+
+@media (max-width: 640px) {
+  .topbar { gap: 6px; padding: 0 10px; }
+  .chapter-indicator { display: none; }
+  .hero h1 { font-size: 30px; }
+  .lede { font-size: 16.5px; }
+  .chapter p,
+  .chapter li { font-size: 16px; }
+  .scene-body { padding: 14px; }
+  .stepper { gap: 6px; }
+  .step-label { width: 100%; margin-left: 0; text-align: right; }
+  .quiz-card { padding: 14px; }
+  .detail-body { padding: 18px 16px 48px; }
+  .modal-head { padding: 14px 16px 10px; }
+  .modal-body { padding: 14px 16px 22px; }
+}
+
+@media (hover: none) {
+  .copy-btn { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+
+@media print {
+  .topbar,
+  .sidebar,
+  .sidebar-backdrop,
+  .stepper,
+  .copy-btn,
+  .modal,
+  .detail,
+  .toast { display: none !important; }
+  .main { margin: 0; padding: 0; }
+  .chapter { break-inside: avoid; }
+  body { background: #fff; color: #000; }
+}
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+
+  <header class="topbar">
+    <button class="icon-btn nav-toggle" id="navToggle" type="button" aria-label="打开知识树" aria-expanded="false">☰</button>
+    <div class="topbar-title">
+      <span class="brand">InterStudy</span>
+      <span class="topic-title" id="topicTitle"></span>
+      <span class="chapter-indicator" id="chapterIndicator"></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="切换深色模式">◐</button>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="知识树">
+      <div class="sidebar-head">
+        <div class="sidebar-kicker">知识地图</div>
+        <label class="search-wrap">
+          <span class="visually-hidden">搜索知识树</span>
+          <input id="treeSearch" class="tree-search" type="search" placeholder="搜索节点…" autocomplete="off">
+        </label>
+      </div>
+      <nav id="tree" class="tree" aria-label="知识树导航"></nav>
+      <div class="sidebar-foot" id="sidebarFoot"></div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+    <main class="main" id="main">
+      <section class="hero" id="hero">
+        <p class="eyebrow" id="heroEyebrow">交互式技术学习</p>
+        <h1 id="heroTitle"></h1>
+        <p class="lede" id="heroLede"></p>
+        <div class="hero-meta" id="heroMeta"></div>
+      </section>
+
+      <div id="chapters"></div>
+
+      <section class="chapter quiz-section" id="quiz" data-chapter="quiz">
+        <div class="chapter-head">
+          <div class="chapter-kicker">测验</div>
+          <h2>检查你的理解</h2>
+        </div>
+        <p class="chapter-summary">五道中等难度的问题。选择后立即看到反馈。</p>
+        <div id="quizRoot"></div>
+      </section>
+
+      <section class="chapter sources-section" id="sources" data-chapter="sources">
+        <div class="chapter-head">
+          <div class="chapter-kicker">参考</div>
+          <h2>来源与证据</h2>
+        </div>
+        <p class="chapter-summary">关键结论的来源。链接在新标签页打开。</p>
+        <div id="sourcesRoot"></div>
+      </section>
+
+      <footer class="page-footer" id="pageFooter"></footer>
+    </main>
+  </div>
+
+  <div class="modal" id="conceptModal" hidden>
+    <div class="modal-backdrop" data-close="concept"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="conceptTitle">
+      <div class="modal-head">
+        <div>
+          <div class="kicker">概念</div>
+          <h2 id="conceptTitle"></h2>
+        </div>
+        <button class="icon-btn" type="button" data-close="concept" aria-label="关闭概念弹窗">×</button>
+      </div>
+      <div class="modal-body" id="conceptBody"></div>
+    </div>
+  </div>
+
+  <div class="detail" id="detail" hidden>
+    <div class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="detail-head">
+        <button class="icon-btn" id="detailBack" type="button" aria-label="返回正文">←</button>
+        <div class="detail-heading">
+          <div class="kicker" id="detailKicker"></div>
+          <h2 id="detailTitle"></h2>
+        </div>
+        <button class="icon-btn" id="detailClose" type="button" aria-label="关闭深入视图">×</button>
+      </div>
+      <div class="detail-body" id="detailBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>
+    window.TOPIC = {"meta":{"title":"Q-learning 的一次真实更新","subtitle":"从贝尔曼方程到 Q 表变化","description":"用 10 分钟理解 Q-learning 如何把一次经验变成一次更新，并看到 DQN 如何把它扩展到神经网络。","language":"zh-CN","slug":"q-learning-smoke","createdAt":"2026-11-26"},"tree":{"rootId":"root","nodes":[{"id":"root","parentId":null,"type":"topic","title":"Q-learning","description":"主题全景","order":0},{"id":"ch-bg","parentId":"root","type":"chapter","title":"背景","targetId":"background","order":1},{"id":"sec-mdp","parentId":"ch-bg","type":"section","title":"MDP","targetId":"sec-mdp","order":1},{"id":"c-mdp","parentId":"ch-bg","type":"concept","title":"MDP","targetId":"mdp","order":2},{"id":"ch-mech","parentId":"root","type":"chapter","title":"机制","targetId":"mechanics","order":2},{"id":"c-bellman","parentId":"ch-mech","type":"concept","title":"贝尔曼方程","targetId":"bellman","order":1},{"id":"a-q","parentId":"ch-mech","type":"algorithm","title":"Q-learning 更新","targetId":"q-update","order":2},{"id":"c-q","parentId":"ch-mech","type":"concept","title":"Q-learning","targetId":"q-learning","order":3},{"id":"ch-sys","parentId":"root","type":"chapter","title":"系统","targetId":"system","order":3},{"id":"m-dqn","parentId":"ch-sys","type":"module","title":"DQN Agent","targetId":"dqn-agent","order":1},{"id":"c-buffer","parentId":"ch-sys","type":"concept","title":"回放缓冲区","targetId":"replay-buffer","order":2},{"id":"c-explore","parentId":"ch-sys","type":"concept","title":"探索","targetId":"exploration","order":3},{"id":"quiz-node","parentId":"root","type":"chapter","title":"测验","targetId":"quiz","order":4},{"id":"sources-node","parentId":"root","type":"chapter","title":"参考","targetId":"sources","order":5}]},"chapters":[{"id":"background","title":"背景：从试错到贝尔曼方程","summary":"本章回答：为什么需要把长期回报写成一个递推式。","order":1,"content":"\u003cp>强化学习把“试错”写成一个可计算的问题：智能体在状态中行动，环境返回奖励和下一状态。\u003cbutton class=\"concept-link\" data-concept=\"mdp\">MDP\u003c/button> 是这套语言的形式化基础。\u003c/p>\u003ch3 id=\"sec-mdp\">从 MDP 到贝尔曼方程\u003c/h3>\u003cp>贝尔曼方程把长期回报拆成“即时奖励 + 折扣后的未来价值”，这让\u003cbutton class=\"concept-link\" data-concept=\"bellman\">贝尔曼方程\u003c/button>成为几乎所有值函数方法的起点。\u003c/p>\u003cdiv data-scene=\"scene-history\">\u003c/div>\u003cblockquote>关键不是记住公式，而是理解每一步为什么需要下一个状态的价值。\u003c/blockquote>\u003cp>来源：\u003ca href=\"#src-sutton2018\" class=\"source-ref\">[1]\u003c/a>\u003c/p>","sceneIds":["scene-history"],"sourceIds":["sutton2018"]},{"id":"mechanics","title":"机制：一次 Q 值更新","summary":"本章回答：一条经验如何改变 Q 表中的一个数。","order":2,"content":"\u003cp>Q-learning 用一张表记录“在状态 s 做动作 a 有多好”。一次更新只需要当前 Q、即时奖励、下一状态的最大 Q 和学习率。\u003c/p>\u003cdiv data-scene=\"scene-q-update\">\u003c/div>\u003cp>把一次交互按时间展开，就是智能体与环境之间不断往返的消息。\u003c/p>\u003cdiv data-scene=\"scene-loop\">\u003c/div>\u003cpre>\u003ccode data-lang=\"python\">q[s, a] = q[s, a] + alpha * (r + gamma * max(q[s2].values()) - q[s, a])\u003c/code>\u003c/pre>\u003cp>算法细节见 \u003cbutton class=\"concept-link\" data-algorithm=\"q-update\">Q-learning 更新\u003c/button>。\u003c/p>","sceneIds":["scene-q-update","scene-loop"],"sourceIds":["watkins1992","sutton2018"]},{"id":"system","title":"系统：从 Q 表到 DQN","summary":"本章回答：状态空间变大后，Q 表如何变成神经网络。","order":3,"content":"\u003cp>当状态空间变大，Q 表会被神经网络替代。下面的架构图展示 DQN 的训练闭环。\u003c/p>\u003cdiv data-scene=\"scene-dqn\">\u003c/div>\u003cdiv data-scene=\"scene-train\">\u003c/div>\u003cdiv data-scene=\"scene-compare\">\u003c/div>\u003cdiv data-scene=\"scene-buffer\">\u003c/div>\u003cdiv data-scene=\"scene-concepts\">\u003c/div>\u003cdiv data-scene=\"scene-future\">\u003c/div>\u003cp>模块细节见 \u003cbutton class=\"concept-link\" data-module=\"dqn-agent\">DQN Agent\u003c/button>，缓冲区见 \u003cbutton class=\"concept-link\" data-concept=\"replay-buffer\">回放缓冲区\u003c/button>。\u003c/p>","sceneIds":["scene-dqn","scene-train","scene-compare","scene-buffer","scene-concepts","scene-future"],"sourceIds":["mnih2015","schulman2017"]}],"concepts":[{"id":"mdp","name":"马尔可夫决策过程","definition":"用状态、动作、转移、奖励和折扣描述序贯决策的形式化框架。","explanation":"它假设下一步只依赖当前状态，而不是全部历史；这让问题可以用递推的方式求解。","principles":["状态必须包含做决策所需的信息","奖励是即时反馈，回报是折扣累加","策略决定在每个状态选择什么动作"],"examples":["网格世界中的位置是状态，上下左右是动作","机器人关节角度是状态，电机指令是动作"],"relatedConceptIds":["bellman"],"sourceIds":["sutton2018"]},{"id":"bellman","name":"贝尔曼方程","definition":"把价值函数写成“即时奖励 + 折扣后的下一状态价值”的递推关系。","explanation":"它把长期问题拆成一步问题：只要知道下一状态的价值，就能修正当前状态的价值。","principles":["价值 = 即时奖励 + 折扣 × 未来价值","最优价值满足贝尔曼最优方程","递推让动态规划成为可能"],"examples":["Q-learning 的目标 r + γ·max Q(s′,a′)","策略评估中的迭代更新"],"relatedConceptIds":["mdp","q-learning"],"sourceIds":["sutton2018"]},{"id":"q-learning","name":"Q-learning","definition":"一种无需环境模型的时序差分控制方法，直接学习状态-动作价值 Q(s,a)。","explanation":"它用实际观察到的奖励和下一状态的最大 Q 值构造目标，再用学习率把当前 Q 拉向目标。","principles":["离策略更新：行为策略和目标策略可以不同","自举：用估计值更新估计值","探索与利用需要平衡"],"examples":["表格型 Q-learning 更新 Q 表","DQN 用神经网络近似 Q(s,a)"],"relatedConceptIds":["bellman","exploration"],"sourceIds":["watkins1992","sutton2018"]},{"id":"replay-buffer","name":"回放缓冲区","definition":"保存历史转移 (s, a, r, s′)，训练时从中采样 mini-batch 的数据结构。","explanation":"它打破连续样本之间的相关性，并让一条经验可以被多次使用，从而提高样本效率。","principles":["先进先出或按优先级采样","容量有限，旧数据会被覆盖","采样批次需要随机化"],"examples":["DQN 使用均匀采样的回放缓冲区","优先经验回放按 TD 误差采样"],"relatedConceptIds":["q-learning"],"sourceIds":["mnih2015"]},{"id":"exploration","name":"探索","definition":"在不确定环境中尝试新动作，以发现可能更好的策略。","explanation":"如果只选当前估计最好的动作，智能体可能永远错过更优解；探索让估计有机会被修正。","principles":["ε-greedy 以概率 ε 随机探索","探索率通常随训练衰减","探索不足会导致局部最优"],"examples":["ε 从 1.0 衰减到 0.1","汤普森采样用于多臂老虎机"],"relatedConceptIds":["q-learning"],"sourceIds":["sutton2018"]}],"algorithms":[{"id":"q-update","name":"Q-learning 更新","problem":"在不知道环境转移概率的情况下，估计每个状态-动作对的长期价值。","background":"时序差分学习把蒙特卡洛的采样和动态规划的自举结合起来，Q-learning 是其中最具代表性的离策略控制方法。","principle":"用 r + γ·max Q(s′,a′) 作为目标，把当前 Q(s,a) 向目标移动 α 步。","prerequisites":["mdp","bellman"],"formulas":["\u003cmath xmlns=\"http://www.w3.org/1998/Math/MathML\">\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>←\u003c/mo>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>+\u003c/mo>\u003cmi>α\u003c/mi>\u003cmo>[\u003c/mo>\u003cmi>r\u003c/mi>\u003cmo>+\u003c/mo>\u003cmi>γ\u003c/mi>\u003cmunder>\u003cmo>max\u003c/mo>\u003cmi>a′\u003c/mi>\u003c/munder>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s′\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a′\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>−\u003c/mo>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>]\u003c/mo>\u003c/math>"],"pseudocode":"for each transition (s, a, r, s2):\n    target = r + gamma * max(Q[s2])\n    Q[s, a] += alpha * (target - Q[s, a])","steps":[{"title":"观察转移","text":"从环境中得到当前状态、动作、奖励和下一状态。"},{"title":"计算目标","text":"用下一状态的最大 Q 值构造 TD 目标。"},{"title":"更新当前值","text":"按学习率把当前 Q 拉向目标。"}],"complexity":{"time":"O(|A|) 每次更新","space":"O(|S|·|A|)"},"advantages":["不需要环境模型","实现简单，适合教学和基线","可以离策略学习"],"limitations":["表格方法难以扩展到高维状态","对学习率和探索敏感","最大化偏差可能高估 Q 值"],"applications":["网格世界","推荐系统冷启动","作为 DQN 的理论基础"],"relatedAlgorithmIds":[],"sourceIds":["watkins1992","sutton2018"]}],"modules":[{"id":"dqn-agent","name":"DQN Agent","responsibility":"用神经网络近似 Q(s,a)，并通过回放缓冲区和目标网络稳定训练。","inputs":["当前状态 s","动作空间大小"],"outputs":["每个动作的 Q 值","选中的动作 a"],"components":["Q 网络","目标网络","回放缓冲区","ε-greedy 策略"],"dependencies":["深度学习框架","环境接口"],"executionFlow":["接收状态并选择动作","把转移写入回放缓冲区","采样 mini-batch","计算 TD 目标并更新 Q 网络","定期同步目标网络"],"implementation":"q_values = online_net(state)\naction = epsilon_greedy(q_values)\nnext_q = target_net(next_state).max(dim=1).values\ntarget = reward + gamma * next_q * (1 - done)\nloss = mse(online_net(state)[action], target)","sourceIds":["mnih2015"]}],"scenes":[{"id":"scene-history","type":"timeline","title":"从动态规划到 DQN","description":"三个关键节点，展示值函数方法如何一步步走向深度强化学习。","data":{"events":[{"date":"1957","title":"动态规划","text":"Bellman 把序贯决策写成递推式。","sourceIds":["sutton2018"]},{"date":"1989","title":"Q-learning","text":"Watkins 提出无需环境模型的离策略控制方法。","sourceIds":["watkins1992"]},{"date":"2015","title":"DQN","text":"DeepMind 用深度网络和回放缓冲区玩 Atari。","sourceIds":["mnih2015"]}]},"sourceIds":["sutton2018"]},{"id":"scene-dqn","type":"architecture","title":"DQN 的训练闭环","description":"数据如何从环境流到网络更新。","data":{"width":760,"height":300,"nodes":[{"id":"env","label":"Environment","x":30,"y":40,"w":160,"h":56,"group":"external","detail":"执行动作，返回奖励 r 和下一状态 s′。","sourceIds":["mnih2015"]},{"id":"buffer","label":"Replay Buffer","x":290,"y":40,"w":160,"h":56,"group":"data","detail":"保存历史转移，均匀采样 mini-batch。"},{"id":"qnet","label":"Q Network","x":550,"y":40,"w":160,"h":56,"group":"model","detail":"输入状态，输出每个动作的 Q 值。"},{"id":"target","label":"Target Net","x":550,"y":180,"w":160,"h":56,"group":"model","detail":"定期从 Q 网络同步，提供稳定的 TD 目标。"}],"edges":[{"from":"env","to":"buffer","label":"transition"},{"from":"buffer","to":"qnet","label":"batch"},{"from":"qnet","to":"target","label":"同步"},{"from":"target","to":"qnet","label":"TD 目标","dashed":true}]},"sourceIds":["mnih2015"]},{"id":"scene-loop","type":"sequence","title":"Agent 与 Environment 的一步交互","description":"动作、奖励和下一状态如何流动。","data":{"actors":["Agent","Environment"],"messages":[{"from":"Agent","to":"Environment","label":"action a_t","note":"策略网络根据 s_t 选择动作。","sourceIds":["sutton2018"]},{"from":"Environment","to":"Agent","label":"r_t, s_{t+1}","note":"环境执行动作并返回反馈。"},{"from":"Agent","to":"Agent","label":"计算 TD 目标","note":"用奖励和下一状态的最大 Q 值构造目标。"}]},"sourceIds":["sutton2018"]},{"id":"scene-train","type":"process","title":"一次 DQN 更新","description":"从采样到参数更新的三个步骤。","data":{"steps":[{"title":"采样","text":"从回放缓冲区取一批 transition。","state":{"batch_size":"32","policy":"ε-greedy"},"sourceIds":["mnih2015"]},{"title":"计算目标","text":"用目标网络计算 r + γ·max Q(s′,a′)。","state":{"gamma":"0.99","target_update":"每 1000 步"}},{"title":"更新网络","text":"对当前 Q 与目标 Q 的均方误差求导并更新。","state":{"loss":"MSE","optimizer":"Adam"}}]},"sourceIds":["mnih2015"]},{"id":"scene-compare","type":"comparison","title":"Q-learning 与 PPO 的取舍","description":"从数据、稳定性和适用场景比较两类方法。","data":{"dimensions":["解决的问题","核心原理","样本效率","适用场景"],"options":[{"name":"Q-learning","values":["离散动作价值","时序差分","较低","离散控制"],"highlight":false},{"name":"PPO","values":["策略优化","策略梯度 + 裁剪","较高","连续/离散控制"],"highlight":true}],"note":"对比基于相同任务预算；样本效率是相对量级，不是精确排名。"},"sourceIds":["sutton2018","schulman2017"]},{"id":"scene-q-update","type":"algorithm","title":"一次 Q-learning 更新","description":"α=0.1，γ=0.9，观察 Q 值如何变化。","data":{"formula":"\u003cmath xmlns=\"http://www.w3.org/1998/Math/MathML\">\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>←\u003c/mo>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>+\u003c/mo>\u003cmi>α\u003c/mi>\u003cmo>[\u003c/mo>\u003cmi>r\u003c/mi>\u003cmo>+\u003c/mo>\u003cmi>γ\u003c/mi>\u003cmunder>\u003cmo>max\u003c/mo>\u003cmi>a′\u003c/mi>\u003c/munder>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s′\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a′\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>−\u003c/mo>\u003cmi>Q\u003c/mi>\u003cmo>(\u003c/mo>\u003cmi>s\u003c/mi>\u003cmo>,\u003c/mo>\u003cmi>a\u003c/mi>\u003cmo>)\u003c/mo>\u003cmo>]\u003c/mo>\u003c/math>","columns":["步骤","状态 s","动作 a","奖励 r","max Q(s′)","Q(s,a) 更新"],"rows":[["1","s1","右","-1","10.0","0.00 → 0.90"],["2","s2","下","0","10.0","0.00 → 0.90"],["3","s4","右","1","10.0","0.00 → 1.90"]],"note":"目标 = r + γ·max Q(s′)；更新量 = α·(目标 − 当前 Q)。"},"sourceIds":["watkins1992"]},{"id":"scene-buffer","type":"data-structure","title":"环形缓冲区的写入","description":"容量为 6，观察指针移动和覆盖。","data":{"items":[{"label":"0","value":"t1"},{"label":"1","value":"t2"},{"label":"2","value":"t3"},{"label":"3","value":"—"},{"label":"4","value":"—"},{"label":"5","value":"—"}],"steps":[{"title":"初始状态","text":"缓冲区已写入 3 条 transition。","highlight":[0,1,2]},{"title":"写入 t4","text":"指针移动到下标 3，写入 t4。","highlight":[3]},{"title":"写入 t7","text":"缓冲区满后覆盖最旧的数据。","highlight":[0]}]},"sourceIds":["mnih2015"]},{"id":"scene-concepts","type":"concept","title":"强化学习的核心概念","description":"实体、学习对象和它们的关系。","data":{"groups":[{"name":"基础","concepts":["mdp","bellman"]},{"name":"方法","concepts":["q-learning","exploration"]},{"name":"系统","concepts":["replay-buffer"]}],"edges":[{"from":"bellman","to":"q-learning","label":"目标"},{"from":"q-learning","to":"exploration","label":"需要"},{"from":"replay-buffer","to":"q-learning","label":"采样"}]},"sourceIds":["sutton2018"]},{"id":"scene-future","type":"future-scenario","title":"强化学习的三个方向","description":"区分已发生、进行中和推测。","data":{"branches":[{"title":"深度强化学习成为标准工具","status":"fact","text":"深度网络与强化学习结合，已经在游戏和控制任务中取得结果。","evidence":"DQN 在 Atari 上的结果开启了这一路线。","sourceIds":["mnih2015"]},{"title":"离线强化学习","status":"trend","text":"从固定数据集中学习策略，减少在线交互。","evidence":"多个基准和工业实践正在出现。","sourceIds":["levine2020"]},{"title":"通用智能体","status":"speculation","text":"用统一策略处理多任务、多环境。","evidence":"目前缺乏统一证据，更多是研究方向。","sourceIds":[]}]},"sourceIds":["sutton2018"]}],"crossReferences":[{"id":"xref-bellman-q","sourceId":"bellman","targetId":"q-update","type":"depends-on","description":"Q-learning 的更新目标来自贝尔曼最优方程。"},{"id":"xref-q-mdp","sourceId":"q-update","targetId":"mdp","type":"related-to","description":"Q-learning 解决的问题是 MDP 中的控制问题。"},{"id":"xref-dqn-q","sourceId":"dqn-agent","targetId":"q-update","type":"implements","description":"DQN 用神经网络实现 Q-learning 的更新目标。"},{"id":"xref-buffer-dqn","sourceId":"replay-buffer","targetId":"dqn-agent","type":"related-to","description":"回放缓冲区是 DQN 训练闭环的数据组件。"}],"sources":[{"id":"sutton2018","title":"Reinforcement Learning: An Introduction","url":"http://incompleteideas.net/book/the-book-2nd.html","type":"book","publisher":"MIT Press","author":"Richard S. Sutton, Andrew G. Barto","publishedAt":"2018","accessedAt":"2026-11-26","evidenceDescription":"第 6 章给出 TD 与 Q-learning 的标准表述。"},{"id":"watkins1992","title":"Q-learning","type":"academic-paper","author":"Christopher J. C. H. Watkins, Peter Dayan","publishedAt":"1992","accessedAt":"2026-11-26","evidenceDescription":"Q-learning 的原始论文，给出收敛条件和更新规则。"},{"id":"mnih2015","title":"Human-level control through deep reinforcement learning","type":"academic-paper","publisher":"Nature","author":"Volodymyr Mnih et al.","publishedAt":"2015","accessedAt":"2026-11-26","evidenceDescription":"DQN 论文，描述回放缓冲区和目标网络。"},{"id":"schulman2017","title":"Proximal Policy Optimization Algorithms","type":"academic-paper","author":"John Schulman et al.","publishedAt":"2017","accessedAt":"2026-11-26","evidenceDescription":"PPO 的裁剪目标与训练流程。"},{"id":"levine2020","title":"Offline Reinforcement Learning: Tutorial, Review, and Perspectives on Open Problems","type":"academic-paper","author":"Sergey Levine et al.","publishedAt":"2020","accessedAt":"2026-11-26","evidenceDescription":"离线强化学习的问题设定与开放问题综述。"}],"quiz":[{"question":"Q-learning 的更新目标是什么？","options":["当前 Q 值","即时奖励加下一状态最大 Q 值","整个回合的总奖励","下一状态的平均 Q 值"],"answer":1,"explanation":"目标是 r + γ·max Q(s′,a′)，再乘以学习率去修正当前 Q。"},{"question":"为什么需要探索？","options":["让训练速度变慢","避免只利用当前估计而错过更优动作","减少环境交互","让奖励变大"],"answer":1,"explanation":"只选当前估计最好的动作可能陷入局部最优；探索让估计有机会被修正。"},{"question":"回放缓冲区的主要作用是什么？","options":["存储环境模型","打破样本相关性并复用经验","直接输出动作","替代奖励函数"],"answer":1,"explanation":"回放缓冲区保存历史转移，训练时随机采样，既降低相关性又提高样本效率。"},{"question":"贝尔曼方程把回报拆成了什么？","options":["即时奖励和折扣后的未来价值","动作和状态","策略和值函数","探索和利用"],"answer":0,"explanation":"贝尔曼方程用“即时奖励 + 折扣 × 下一状态价值”表示长期回报。"},{"question":"DQN 中目标网络的作用是什么？","options":["增加探索","提供更稳定的 TD 目标","存储回放数据","替代 Q 网络"],"answer":1,"explanation":"目标网络定期同步，避免目标随当前网络每步变化，从而稳定训练。"}]};
+    /* 核心：数据索引、知识树、章节、滚动联动、主题与校验 */
+const IS = {
+  T: window.TOPIC || {},
+  state: {
+    currentChapterId: null,
+    activeTreeNodeId: null,
+    expanded: new Set(),
+    preSearchExpanded: null,
+    treeInitialized: false,
+    theme: 'light',
+    lastFocus: null,
+    warnings: []
+  },
+  maps: {},
+  dom: {
+    treeNodes: new Map(),
+    treeRows: new Map(),
+    treeToggles: new Map(),
+    treeChildUls: new Map()
+  }
+};
+
+const TYPE_LABELS = {
+  topic: '主题', chapter: '章节', section: '小节', concept: '概念',
+  algorithm: '算法', module: '模块', component: '组件', process: '流程'
+};
+const TYPE_BADGES = {
+  topic: '◆', chapter: '§', section: '·', concept: 'C',
+  algorithm: 'A', module: 'M', component: '⬡', process: '→'
+};
+const SOURCE_TYPE_LABELS = {
+  'official-documentation': '官方文档', 'academic-paper': '论文', github: 'GitHub',
+  'technical-blog': '技术博客', book: '书籍', other: '其他'
+};
+const XREF_LABELS = {
+  'depends-on': '依赖', 'related-to': '相关', 'compared-with': '对比',
+  'implements': '实现', 'extends': '扩展', 'communicates-with': '通信',
+  'alternative-to': '替代'
+};
+
+function $(sel, root = document) { return root.querySelector(sel); }
+function $$(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+
+function el(tag, className, html) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (html != null) node.innerHTML = html;
+  return node;
+}
+
+function svgEl(tag, attrs = {}) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.entries(attrs).forEach(([k, v]) => {
+    if (v != null) node.setAttribute(k, v);
+  });
+  return node;
+}
+
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function raw(value) { return value == null ? '' : String(value); }
+
+function byId(list) {
+  const map = new Map();
+  (list || []).forEach(item => { if (item && item.id) map.set(item.id, item); });
+  return map;
+}
+
+function typeLabel(type) { return TYPE_LABELS[type] || type; }
+function badgeFor(type) { return TYPE_BADGES[type] || '·'; }
+
+function sourceTitle(id) {
+  const source = IS.maps.sources && IS.maps.sources.get(id);
+  return source ? source.title : id;
+}
+
+function sourceChips(ids) {
+  const list = (ids || []).filter(Boolean);
+  if (!list.length) return '';
+  return list.map(id => {
+    const title = sourceTitle(id);
+    const short = title.length > 30 ? title.slice(0, 30) + '…' : title;
+    return `<a class="source-chip" href="#src-${esc(id)}" title="${esc(title)}">${esc(short)}</a>`;
+  }).join('');
+}
+
+function refButton(id, label) {
+  const text = label || (IS.maps.concepts.get(id) || IS.maps.algorithms.get(id) ||
+    IS.maps.modules.get(id) || IS.maps.chapters.get(id) || {}).name || id;
+  if (IS.maps.concepts.has(id)) return `<button class="concept-link" data-concept="${esc(id)}">${esc(text)}</button>`;
+  if (IS.maps.algorithms.has(id)) return `<button class="concept-link" data-algorithm="${esc(id)}">${esc(text)}</button>`;
+  if (IS.maps.modules.has(id)) return `<button class="concept-link" data-module="${esc(id)}">${esc(text)}</button>`;
+  const chapter = IS.maps.chapters.get(id);
+  if (chapter) return `<a href="#ch-${esc(id)}">${esc(text)}</a>`;
+  if (id === 'quiz') return '<a href="#quiz">测验</a>';
+  if (id === 'sources') return '<a href="#sources">参考</a>';
+  return `<span>${esc(text)}</span>`;
+}
+
+function chapterLabel(id) {
+  if (id === 'quiz') return '测验';
+  if (id === 'sources') return '参考';
+  const chapter = IS.maps.chapters.get(id);
+  return chapter ? chapter.title : id;
+}
+
+function xrefLabel(type) { return XREF_LABELS[type] || type; }
+function sourceTypeLabel(type) { return SOURCE_TYPE_LABELS[type] || type || '来源'; }
+
+function toast(message) {
+  const node = $('#toast');
+  if (!node) return;
+  node.textContent = message;
+  node.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { node.hidden = true; }, 1600);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('已复制');
+  } catch (error) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); toast('已复制'); }
+    catch (err) { toast('复制失败，请手动选择'); }
+    area.remove();
+  }
+}
+
+function highlightCode(code, lang) {
+  if (code.dataset.highlighted) return;
+  const source = code.textContent;
+  if (!source.trim()) return;
+  try {
+    const escaped = source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const hashLangs = /^(py|python|sh|bash|shell|yaml|yml|ruby|rb|toml)$/i;
+    const slashLangs = /^(js|javascript|ts|typescript|jsx|tsx|java|c|cpp|cs|csharp|go|rust|rs|swift|kotlin|kt|json|css|scss|less)$/i;
+    let commentPattern;
+    if (hashLangs.test(lang)) commentPattern = '#[^\\n]*';
+    else if (slashLangs.test(lang)) commentPattern = '\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/';
+    else commentPattern = '\\/\\/[^\\n]*|#[^\\n]*';
+    const stringPattern = "\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`";
+    const re = new RegExp(`(${commentPattern})|(${stringPattern})|(\\b\\d+(?:\\.\\d+)?\\b)|(\\b[A-Za-z_][A-Za-z0-9_]*\\b)`, 'g');
+    const keywords = new Set([
+      'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'class', 'new',
+      'import', 'from', 'export', 'default', 'async', 'await', 'try', 'catch', 'finally', 'throw',
+      'typeof', 'instanceof', 'in', 'of', 'this', 'super', 'extends', 'implements', 'interface',
+      'type', 'enum', 'def', 'self', 'None', 'True', 'False', 'and', 'or', 'not', 'is', 'lambda',
+      'with', 'as', 'pass', 'break', 'continue', 'yield', 'raise', 'except', 'global', 'nonlocal',
+      'print', 'range', 'len', 'int', 'float', 'str', 'list', 'dict', 'set', 'tuple', 'do', 'switch',
+      'case', 'void', 'public', 'private', 'protected', 'static', 'final', 'struct', 'impl', 'fn',
+      'mut', 'use', 'mod', 'pub', 'match', 'where', 'select', 'insert', 'update', 'delete', 'create'
+    ]);
+    let out = '';
+    let last = 0;
+    let match;
+    while ((match = re.exec(escaped))) {
+      out += escaped.slice(last, match.index);
+      if (match[1]) out += `<span class="tok-com">${match[1]}</span>`;
+      else if (match[2]) out += `<span class="tok-str">${match[2]}</span>`;
+      else if (match[3]) out += `<span class="tok-num">${match[3]}</span>`;
+      else if (match[4] && keywords.has(match[4])) out += `<span class="tok-key">${match[4]}</span>`;
+      else out += match[4];
+      last = re.lastIndex;
+    }
+    out += escaped.slice(last);
+    code.innerHTML = out;
+    code.dataset.highlighted = '1';
+  } catch (error) {
+    console.warn('[InterStudy] 代码高亮失败', error);
+  }
+}
+
+function setupCodeBlocks(root) {
+  $$('pre', root).forEach(pre => {
+    if (pre.querySelector('.copy-btn')) return;
+    const code = pre.querySelector('code');
+    if (!code) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-btn';
+    button.textContent = '复制';
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      copyText(code.textContent);
+    });
+    pre.appendChild(button);
+    if (code.dataset.lang) highlightCode(code, code.dataset.lang);
+  });
+}
+
+function validateTopic() {
+  const warnings = [];
+  const T = IS.T;
+  const meta = T.meta || {};
+  if (!meta.title) warnings.push('meta.title 缺失');
+  if (!meta.slug) warnings.push('meta.slug 缺失，文件名将使用 topic');
+  if (!Array.isArray(T.chapters) || !T.chapters.length) warnings.push('至少需要一个章节');
+  if (!T.tree || !Array.isArray(T.tree.nodes) || !T.tree.nodes.length) warnings.push('知识树为空');
+  if (Array.isArray(T.quiz) && T.quiz.length !== 5) warnings.push(`测验应为 5 题，当前 ${T.quiz.length} 题`);
+  if (!Array.isArray(T.quiz) || !T.quiz.length) warnings.push('测验为空');
+
+  const chapterIds = new Set((T.chapters || []).map(c => c.id));
+  if (chapterIds.has('quiz') || chapterIds.has('sources')) warnings.push('章节 id 不能使用 quiz 或 sources');
+
+  (T.chapters || []).forEach(ch => {
+    (ch.sceneIds || []).forEach(id => {
+      if (!IS.maps.scenes.has(id)) warnings.push(`章节 ${ch.id} 引用了不存在的场景 ${id}`);
+    });
+    (ch.sourceIds || []).forEach(id => {
+      if (!IS.maps.sources.has(id)) warnings.push(`章节 ${ch.id} 引用了不存在的来源 ${id}`);
+    });
+    if (/<script\b/i.test(ch.content || '')) warnings.push(`章节 ${ch.id} 包含 <script>`);
+  });
+
+  (T.tree.nodes || []).forEach(node => {
+    const target = node.targetId;
+    if (!target) return;
+    if (node.type === 'chapter' && !chapterIds.has(target) && target !== 'quiz' && target !== 'sources') {
+      warnings.push(`树节点 ${node.id} 指向不存在的章节 ${target}`);
+    }
+    if (node.type === 'concept' && !IS.maps.concepts.has(target)) warnings.push(`树节点 ${node.id} 指向不存在的概念 ${target}`);
+    if (node.type === 'algorithm' && !IS.maps.algorithms.has(target)) warnings.push(`树节点 ${node.id} 指向不存在的算法 ${target}`);
+    if ((node.type === 'module' || node.type === 'component') && !IS.maps.modules.has(target)) {
+      warnings.push(`树节点 ${node.id} 指向不存在的模块 ${target}`);
+    }
+    if (node.type === 'process' && !IS.maps.algorithms.has(target) && !IS.maps.modules.has(target)) {
+      warnings.push(`树节点 ${node.id} 指向不存在的流程对象 ${target}`);
+    }
+  });
+
+  (T.concepts || []).forEach(c => {
+    (c.relatedConceptIds || []).forEach(id => {
+      if (!IS.maps.concepts.has(id)) warnings.push(`概念 ${c.id} 关联了不存在的概念 ${id}`);
+    });
+  });
+  (T.algorithms || []).forEach(a => {
+    (a.relatedAlgorithmIds || []).forEach(id => {
+      if (!IS.maps.algorithms.has(id)) warnings.push(`算法 ${a.id} 关联了不存在的算法 ${id}`);
+    });
+  });
+  (T.quiz || []).forEach((q, i) => {
+    if (!Array.isArray(q.options) || q.options.length < 2) warnings.push(`测验第 ${i + 1} 题选项不足`);
+    if (typeof q.answer !== 'number' || q.answer < 0 || q.answer >= (q.options || []).length) {
+      warnings.push(`测验第 ${i + 1} 题 answer 下标无效`);
+    }
+  });
+
+  IS.state.warnings = warnings;
+  if (warnings.length) {
+    console.warn('[InterStudy] 内容校验警告：', warnings);
+    if (/[?&](debug|validate)\b/.test(location.search)) {
+      const banner = el('div', 'callout');
+      banner.innerHTML = `<strong>内容校验警告</strong><ul>${warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`;
+      $('#main').prepend(banner);
+    }
+  }
+}
+
+IS.index = function () {
+  const T = IS.T;
+  T.chapters = T.chapters || [];
+  T.concepts = T.concepts || [];
+  T.algorithms = T.algorithms || [];
+  T.modules = T.modules || [];
+  T.scenes = T.scenes || [];
+  T.sources = T.sources || [];
+  T.crossReferences = T.crossReferences || [];
+  T.quiz = T.quiz || [];
+  T.tree = T.tree || { rootId: null, nodes: [] };
+  T.tree.nodes = T.tree.nodes || [];
+
+  IS.maps.chapters = byId(T.chapters);
+  IS.maps.concepts = byId(T.concepts);
+  IS.maps.algorithms = byId(T.algorithms);
+  IS.maps.modules = byId(T.modules);
+  IS.maps.scenes = byId(T.scenes);
+  IS.maps.sources = byId(T.sources);
+  IS.maps.nodes = byId(T.tree.nodes);
+  IS.maps.children = new Map();
+  T.tree.nodes.forEach(node => {
+    const key = node.parentId || '__root__';
+    if (!IS.maps.children.has(key)) IS.maps.children.set(key, []);
+    IS.maps.children.get(key).push(node);
+  });
+  IS.maps.children.forEach(list => list.sort((a, b) => (a.order || 0) - (b.order || 0)));
+};
+
+function childrenOf(id) { return IS.maps.children.get(id) || []; }
+
+IS.renderHero = function () {
+  const meta = IS.T.meta || {};
+  $('#heroEyebrow').textContent = meta.subtitle || '交互式技术学习';
+  $('#heroTitle').textContent = meta.title || '未命名主题';
+  $('#heroLede').textContent = meta.description || '';
+  $('#topicTitle').textContent = meta.title || '';
+
+  const chapters = IS.T.chapters || [];
+  const scenes = IS.T.scenes || [];
+  const sources = IS.T.sources || [];
+  const chars = chapters.reduce((sum, ch) => sum + String(ch.content || '').replace(/<[^>]+>/g, '').length, 0);
+  const minutes = Math.max(5, Math.round(chars / 500));
+
+  const chips = [
+    `${chapters.length} 章`,
+    `${scenes.length} 个图解`,
+    `约 ${minutes} 分钟`,
+    `${sources.length} 个来源`
+  ];
+  const metaRoot = $('#heroMeta');
+  metaRoot.innerHTML = '';
+  chips.forEach(text => metaRoot.appendChild(el('span', 'meta-chip', esc(text))));
+
+  $('#sidebarFoot').textContent = `${chapters.length} 章 · ${scenes.length} 个图解 · ${sources.length} 个来源`;
+  $('#pageFooter').innerHTML = `<span>InterStudy · 交互式技术学习页</span><span>${esc(meta.createdAt || '')}${meta.createdAt ? ' · ' : ''}关键结论请查阅原始来源</span>`;
+};
+
+IS.renderChapters = function () {
+  const root = $('#chapters');
+  root.innerHTML = '';
+  const chapters = (IS.T.chapters || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!chapters.length) {
+    root.appendChild(el('p', 'empty', '暂无章节。'));
+    return;
+  }
+  chapters.forEach((chapter, index) => {
+    const section = document.createElement('section');
+    section.className = 'chapter';
+    section.id = `ch-${chapter.id}`;
+    section.dataset.chapter = chapter.id;
+
+    const head = el('div', 'chapter-head');
+    head.innerHTML = `<div class="chapter-kicker">第 ${index + 1} 章</div><h2>${esc(chapter.title || '')}</h2>${chapter.summary ? `<p class="chapter-summary">${esc(chapter.summary)}</p>` : ''}`;
+    section.appendChild(head);
+
+    const content = el('div', 'chapter-content', raw(chapter.content));
+    section.appendChild(content);
+    IS.renderScenesInChapter(content, chapter);
+
+    const sources = document.createElement('div');
+    if (chapter.sourceIds && chapter.sourceIds.length) {
+      sources.className = 'chapter-sources';
+      sources.innerHTML = `<span class="label">本章来源</span>${sourceChips(chapter.sourceIds)}`;
+      section.appendChild(sources);
+    }
+    root.appendChild(section);
+  });
+};
+
+IS.renderTree = function () {
+  const tree = $('#tree');
+  tree.innerHTML = '';
+  const rootNode = IS.maps.nodes.get(IS.T.tree.rootId);
+  if (!rootNode) {
+    tree.appendChild(el('p', 'empty', '知识树为空。'));
+    return;
+  }
+  if (!IS.state.treeInitialized) {
+    IS.state.expanded.add(rootNode.id);
+    childrenOf(rootNode.id).forEach(node => IS.state.expanded.add(node.id));
+    IS.state.treeInitialized = true;
+  }
+  tree.appendChild(buildTreeNode(rootNode));
+  IS.updateTreeActive(IS.state.currentChapterId);
+};
+
+function buildTreeNode(node) {
+  const li = document.createElement('li');
+  li.className = `tree-node type-${node.type}`;
+  li.dataset.nodeId = node.id;
+  IS.dom.treeNodes.set(node.id, li);
+
+  const row = document.createElement('div');
+  row.className = 'tree-row';
+  row.dataset.nodeId = node.id;
+  row.setAttribute('role', 'treeitem');
+  IS.dom.treeRows.set(node.id, row);
+
+  const children = childrenOf(node.id);
+  if (children.length) {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'tree-toggle';
+    toggle.textContent = '▸';
+    toggle.setAttribute('aria-label', `展开或收起 ${node.title || ''}`);
+    toggle.setAttribute('aria-expanded', String(IS.state.expanded.has(node.id)));
+    if (IS.state.expanded.has(node.id)) toggle.classList.add('open');
+    toggle.addEventListener('click', event => {
+      event.stopPropagation();
+      toggleTreeNode(node.id);
+    });
+    row.appendChild(toggle);
+    IS.dom.treeToggles.set(node.id, toggle);
+  } else {
+    row.appendChild(el('span', 'tree-spacer'));
+  }
+
+  const badge = el('span', 'tree-badge', esc(badgeFor(node.type)));
+  badge.title = typeLabel(node.type);
+  row.appendChild(badge);
+  row.appendChild(el('span', 'tree-title', esc(node.title || '')));
+
+  row.addEventListener('click', () => activateTreeNode(node));
+  li.appendChild(row);
+
+  if (children.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'tree-children';
+    ul.hidden = !IS.state.expanded.has(node.id);
+    children.forEach(child => ul.appendChild(buildTreeNode(child)));
+    li.appendChild(ul);
+    IS.dom.treeChildUls.set(node.id, ul);
+  }
+  return li;
+}
+
+function applyExpanded(id, open) {
+  const ul = IS.dom.treeChildUls.get(id);
+  const toggle = IS.dom.treeToggles.get(id);
+  if (ul) ul.hidden = !open;
+  if (toggle) {
+    toggle.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+  if (open) IS.state.expanded.add(id);
+  else IS.state.expanded.delete(id);
+}
+
+function toggleTreeNode(id) {
+  const open = !IS.state.expanded.has(id);
+  applyExpanded(id, open);
+}
+
+function expandAncestors(id) {
+  let node = IS.maps.nodes.get(id);
+  while (node && node.parentId) {
+    applyExpanded(node.parentId, true);
+    node = IS.maps.nodes.get(node.parentId);
+  }
+}
+
+function activateTreeNode(node) {
+  if (node.type === 'topic') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (node.type === 'concept') {
+    IS.openConcept(node.targetId);
+  } else if (node.type === 'algorithm') {
+    IS.openDetail('algorithm', node.targetId);
+  } else if (node.type === 'module' || node.type === 'component') {
+    IS.openDetail('module', node.targetId);
+  } else if (node.type === 'process') {
+    IS.openDetail(IS.maps.algorithms.has(node.targetId) ? 'algorithm' : 'module', node.targetId);
+  } else {
+    IS.scrollToTarget(node.targetId);
+  }
+  IS.closeNav();
+}
+
+IS.scrollToTarget = function (id) {
+  if (!id) return;
+  const direct = document.getElementById(id);
+  const chapter = document.getElementById(`ch-${id}`);
+  if (chapter) {
+    chapter.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    IS.setActiveChapter(id);
+    return;
+  }
+  if (direct) {
+    direct.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const parent = direct.closest('[data-chapter]');
+    if (parent) IS.setActiveChapter(parent.dataset.chapter);
+  }
+};
+
+IS.setActiveChapter = function (id) {
+  if (!id) return;
+  if (IS.state.currentChapterId === id && IS.state.activeTreeNodeId) return;
+  const same = IS.state.currentChapterId === id;
+  IS.state.currentChapterId = id;
+  $('#chapterIndicator').textContent = chapterLabel(id);
+
+  IS.dom.treeRows.forEach(row => {
+    row.classList.remove('active');
+    row.removeAttribute('aria-current');
+  });
+
+  const matches = (IS.T.tree.nodes || []).filter(node =>
+    node.targetId === id && (node.type === 'chapter' || node.type === 'section')
+  );
+  matches.forEach(node => {
+    const row = IS.dom.treeRows.get(node.id);
+    if (row) {
+      row.classList.add('active');
+      row.setAttribute('aria-current', 'page');
+      IS.state.activeTreeNodeId = node.id;
+    }
+    expandAncestors(node.id);
+  });
+
+  if (!same && matches.length) {
+    const first = IS.dom.treeRows.get(matches[0].id);
+    const tree = $('#tree');
+    if (first && tree) {
+      const rowRect = first.getBoundingClientRect();
+      const treeRect = tree.getBoundingClientRect();
+      if (rowRect.top < treeRect.top || rowRect.bottom > treeRect.bottom) {
+        tree.scrollTop += rowRect.top - treeRect.top - tree.clientHeight / 2;
+      }
+    }
+  }
+};
+
+IS.updateTreeActive = function (id) { if (id) IS.setActiveChapter(id); };
+
+function setupTreeSearch() {
+  const input = $('#treeSearch');
+  if (!input) return;
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => applyTreeSearch(input.value.trim()), 120);
+  });
+}
+
+function applyTreeSearch(query) {
+  const nodes = IS.T.tree.nodes || [];
+  if (!query) {
+    if (IS.state.preSearchExpanded) {
+      IS.state.expanded = new Set(IS.state.preSearchExpanded);
+      IS.state.preSearchExpanded = null;
+    }
+    nodes.forEach(node => {
+      const li = IS.dom.treeNodes.get(node.id);
+      const row = IS.dom.treeRows.get(node.id);
+      if (li) li.hidden = false;
+      if (row) row.classList.remove('match');
+      applyExpanded(node.id, IS.state.expanded.has(node.id));
+    });
+    return;
+  }
+  if (!IS.state.preSearchExpanded) {
+    IS.state.preSearchExpanded = new Set(IS.state.expanded);
+  }
+  const needle = query.toLowerCase();
+  const matches = new Set();
+  nodes.forEach(node => {
+    const text = `${node.title || ''} ${node.description || ''}`.toLowerCase();
+    if (text.includes(needle)) matches.add(node.id);
+  });
+  const visible = new Set(matches);
+  matches.forEach(id => {
+    let node = IS.maps.nodes.get(id);
+    while (node && node.parentId) {
+      visible.add(node.parentId);
+      node = IS.maps.nodes.get(node.parentId);
+    }
+  });
+  nodes.forEach(node => {
+    const li = IS.dom.treeNodes.get(node.id);
+    const row = IS.dom.treeRows.get(node.id);
+    if (li) li.hidden = !visible.has(node.id);
+    if (row) row.classList.toggle('match', matches.has(node.id));
+  });
+  visible.forEach(id => applyExpanded(id, true));
+}
+
+IS.closeNav = function () {};
+
+function setupMobileNav() {
+  const body = document.body;
+  const button = $('#navToggle');
+  const backdrop = $('#sidebarBackdrop');
+  if (!button || !backdrop) return;
+  const open = () => {
+    body.classList.add('nav-open');
+    button.setAttribute('aria-expanded', 'true');
+    backdrop.hidden = false;
+  };
+  const close = () => {
+    body.classList.remove('nav-open');
+    button.setAttribute('aria-expanded', 'false');
+    backdrop.hidden = true;
+  };
+  IS.closeNav = close;
+  button.addEventListener('click', () => body.classList.contains('nav-open') ? close() : open());
+  backdrop.addEventListener('click', close);
+  window.addEventListener('resize', () => { if (window.innerWidth > 900) close(); });
+}
+
+function setupTheme() {
+  const root = document.documentElement;
+  const button = $('#themeToggle');
+  const setTheme = theme => {
+    root.dataset.theme = theme;
+    IS.state.theme = theme;
+    if (button) {
+      button.textContent = theme === 'dark' ? '☀' : '◐';
+      button.setAttribute('aria-label', theme === 'dark' ? '切换浅色模式' : '切换深色模式');
+    }
+    try { localStorage.setItem('interstudy-theme', theme); } catch (error) { /* 离线文件可能禁用存储 */ }
+  };
+  let saved = null;
+  try { saved = localStorage.getItem('interstudy-theme'); } catch (error) { /* ignore */ }
+  setTheme(saved === 'dark' ? 'dark' : 'light');
+  if (button) {
+    button.addEventListener('click', () => setTheme(IS.state.theme === 'dark' ? 'light' : 'dark'));
+  }
+}
+
+function setupScrollSpy() {
+  const sections = $$('.chapter');
+  if (!sections.length) return;
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+    const bar = $('#progressBar');
+    if (bar) bar.style.width = `${progress * 100}%`;
+
+    const line = window.scrollY + 150;
+    let current = sections[0];
+    sections.forEach(section => {
+      if (section.getBoundingClientRect().top + window.scrollY <= line) current = section;
+    });
+    if (current && current.dataset.chapter) IS.setActiveChapter(current.dataset.chapter);
+  };
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(update);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  update();
+}
+
+function setupGlobalClicks() {
+  document.addEventListener('click', event => {
+    const concept = event.target.closest('[data-concept]');
+    if (concept) {
+      event.preventDefault();
+      IS.openConcept(concept.dataset.concept);
+      IS.closeNav();
+      return;
+    }
+    const algorithm = event.target.closest('[data-algorithm]');
+    if (algorithm) {
+      event.preventDefault();
+      IS.openDetail('algorithm', algorithm.dataset.algorithm);
+      IS.closeNav();
+      return;
+    }
+    const module = event.target.closest('[data-module]');
+    if (module) {
+      event.preventDefault();
+      IS.openDetail('module', module.dataset.module);
+      IS.closeNav();
+      return;
+    }
+    const close = event.target.closest('[data-close="concept"]');
+    if (close) {
+      event.preventDefault();
+      IS.closeConcept();
+      return;
+    }
+    const sourceLink = event.target.closest('a[href^="#src-"]');
+    if (sourceLink) {
+      IS.closeAllOverlays();
+      return;
+    }
+    const pageLink = event.target.closest('a[href^="#ch-"], a[href="#quiz"], a[href="#sources"]');
+    if (pageLink && (!document.getElementById('detail').hidden || !document.getElementById('conceptModal').hidden)) {
+      IS.closeAllOverlays();
+    }
+  });
+
+  const detail = $('#detail');
+  if (detail) {
+    detail.addEventListener('click', event => {
+      if (event.target === detail) IS.closeDetail();
+    });
+  }
+  const back = $('#detailBack');
+  const close = $('#detailClose');
+  if (back) back.addEventListener('click', () => IS.closeDetail());
+  if (close) close.addEventListener('click', () => IS.closeDetail());
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (!document.getElementById('conceptModal').hidden) IS.closeConcept();
+    else if (!document.getElementById('detail').hidden) IS.closeDetail();
+  });
+}
+
+IS.init = function () {
+  IS.index();
+  validateTopic();
+  IS.renderHero();
+  IS.renderChapters();
+  IS.renderTree();
+  IS.renderQuiz();
+  IS.renderSourcesSection();
+  setupTheme();
+  setupTreeSearch();
+  setupMobileNav();
+  setupGlobalClicks();
+  setupScrollSpy();
+  setupCodeBlocks(document);
+
+  const hash = decodeURIComponent(location.hash.slice(1));
+  let initial = (IS.T.chapters[0] || {}).id || null;
+  if (hash.startsWith('ch-')) initial = hash.slice(3);
+  else if (hash === 'quiz' || hash === 'sources') initial = hash;
+  if (initial) IS.setActiveChapter(initial);
+  if (hash && document.getElementById(hash)) {
+    setTimeout(() => document.getElementById(hash).scrollIntoView({ block: 'start' }), 0);
+  }
+};
+
+/* 概念弹窗、算法/模块深入视图、来源列表 */
+IS.state.lockCount = IS.state.lockCount || 0;
+
+function lockBody() {
+  IS.state.lockCount += 1;
+  document.body.classList.add('locked');
+}
+
+function unlockBody() {
+  IS.state.lockCount = Math.max(0, IS.state.lockCount - 1);
+  if (!IS.state.lockCount) document.body.classList.remove('locked');
+}
+
+function detailSection(title, content) {
+  if (!content) return '';
+  return `<div class="detail-section"><h3>${esc(title)}</h3>${content}</div>`;
+}
+
+function listHtml(items) {
+  if (!items || !items.length) return '';
+  return `<ul>${items.map(item => `<li>${raw(item)}</li>`).join('')}</ul>`;
+}
+
+function pillRow(items) {
+  if (!items || !items.length) return '';
+  return `<div class="pill-row">${items.map(item => `<span class="pill">${esc(item)}</span>`).join('')}</div>`;
+}
+
+function relatedHtml(obj, type) {
+  const ids = new Set();
+  if (type === 'concept') (obj.relatedConceptIds || []).forEach(id => ids.add(id));
+  if (type === 'algorithm') (obj.relatedAlgorithmIds || []).forEach(id => ids.add(id));
+  const refs = (IS.T.crossReferences || []).filter(ref => ref.sourceId === obj.id || ref.targetId === obj.id);
+  refs.forEach(ref => ids.add(ref.sourceId === obj.id ? ref.targetId : ref.sourceId));
+  ids.delete(obj.id);
+
+  const pills = Array.from(ids).map(id => `<span class="pill">${refButton(id)}</span>`).join('');
+  const relations = refs.map(ref => {
+    const other = ref.sourceId === obj.id ? ref.targetId : ref.sourceId;
+    return `<li><span class="pill">${esc(xrefLabel(ref.type))}</span> ${refButton(other)}${ref.description ? `<span class="empty"> ${raw(ref.description)}</span>` : ''}</li>`;
+  }).join('');
+
+  if (!pills && !relations) return '';
+  return `${pills ? `<div class="pill-row">${pills}</div>` : ''}${relations ? `<ul class="relation-list">${relations}</ul>` : ''}`;
+}
+
+function buildConceptBody(concept) {
+  const parts = [];
+  parts.push(detailSection('定义', concept.definition ? `<p>${raw(concept.definition)}</p>` : ''));
+  parts.push(detailSection('通俗解释', concept.explanation ? `<p>${raw(concept.explanation)}</p>` : ''));
+  parts.push(detailSection('技术原理', listHtml(concept.principles)));
+  parts.push(detailSection('示例', listHtml(concept.examples)));
+  parts.push(detailSection('相关与关联', relatedHtml(concept, 'concept')));
+  if (concept.sourceIds && concept.sourceIds.length) {
+    parts.push(detailSection('来源', `<div class="chip-row">${sourceChips(concept.sourceIds)}</div>`));
+  }
+  return parts.filter(Boolean).join('') || '<p class="empty">暂无详细内容。</p>';
+}
+
+function buildAlgorithmDetail(algorithm) {
+  const parts = [];
+  parts.push(detailSection('它解决的问题', algorithm.problem ? `<p>${raw(algorithm.problem)}</p>` : ''));
+  parts.push(detailSection('背景', algorithm.background ? `<p>${raw(algorithm.background)}</p>` : ''));
+  parts.push(detailSection('前置概念', pillRow(algorithm.prerequisites)));
+  parts.push(detailSection('核心思想', algorithm.principle ? `<p>${raw(algorithm.principle)}</p>` : ''));
+  if (algorithm.formulas && algorithm.formulas.length) {
+    parts.push(detailSection('公式', algorithm.formulas.map(formula => `<div class="formula">${raw(formula)}</div>`).join('')));
+  }
+  if (algorithm.pseudocode) {
+    parts.push(detailSection('伪代码', `<pre><code>${esc(algorithm.pseudocode)}</code></pre>`));
+  }
+  if (algorithm.steps && algorithm.steps.length) {
+    parts.push(detailSection('执行步骤', `<ol>${algorithm.steps.map(step => `<li><strong>${esc(step.title || '')}</strong>${step.text ? `：${raw(step.text)}` : ''}</li>`).join('')}</ol>`));
+  }
+  if (algorithm.complexity) {
+    const complexity = [];
+    if (algorithm.complexity.time) complexity.push(`时间：${algorithm.complexity.time}`);
+    if (algorithm.complexity.space) complexity.push(`空间：${algorithm.complexity.space}`);
+    parts.push(detailSection('复杂度', pillRow(complexity)));
+  }
+  parts.push(detailSection('优势', listHtml(algorithm.advantages)));
+  parts.push(detailSection('局限', listHtml(algorithm.limitations)));
+  parts.push(detailSection('适用场景', listHtml(algorithm.applications)));
+  parts.push(detailSection('相关与关联', relatedHtml(algorithm, 'algorithm')));
+  if (algorithm.sourceIds && algorithm.sourceIds.length) {
+    parts.push(detailSection('来源', `<div class="chip-row">${sourceChips(algorithm.sourceIds)}</div>`));
+  }
+  return parts.filter(Boolean).join('') || '<p class="empty">暂无详细内容。</p>';
+}
+
+function buildModuleDetail(module) {
+  const parts = [];
+  parts.push(detailSection('模块职责', module.responsibility ? `<p>${raw(module.responsibility)}</p>` : ''));
+  parts.push(detailSection('输入', listHtml(module.inputs)));
+  parts.push(detailSection('输出', listHtml(module.outputs)));
+  parts.push(detailSection('内部组件', pillRow(module.components)));
+  parts.push(detailSection('依赖', pillRow(module.dependencies)));
+  if (module.executionFlow && module.executionFlow.length) {
+    parts.push(detailSection('执行流程', `<ol>${module.executionFlow.map(step => `<li>${raw(step)}</li>`).join('')}</ol>`));
+  }
+  if (module.implementation) {
+    parts.push(detailSection('关键实现', `<pre><code>${esc(module.implementation)}</code></pre>`));
+  }
+  parts.push(detailSection('相关与关联', relatedHtml(module, 'module')));
+  if (module.sourceIds && module.sourceIds.length) {
+    parts.push(detailSection('来源', `<div class="chip-row">${sourceChips(module.sourceIds)}</div>`));
+  }
+  return parts.filter(Boolean).join('') || '<p class="empty">暂无详细内容。</p>';
+}
+
+IS.openConcept = function (id) {
+  const concept = IS.maps.concepts.get(id);
+  if (!concept) {
+    console.warn('[InterStudy] 未找到概念', id);
+    return;
+  }
+  const modal = $('#conceptModal');
+  if (modal.hidden) {
+    IS.state.lastFocus = document.activeElement;
+    lockBody();
+  }
+  $('#conceptTitle').textContent = concept.name || id;
+  const body = $('#conceptBody');
+  body.innerHTML = buildConceptBody(concept);
+  setupCodeBlocks(body);
+  modal.hidden = false;
+  const panel = modal.querySelector('.modal-panel');
+  if (panel) panel.scrollTop = 0;
+  const close = modal.querySelector('[data-close="concept"]');
+  if (close) close.focus();
+};
+
+IS.closeConcept = function (restoreFocus = true) {
+  const modal = $('#conceptModal');
+  if (!modal || modal.hidden) return;
+  modal.hidden = true;
+  unlockBody();
+  if (restoreFocus && IS.state.lastFocus && document.contains(IS.state.lastFocus)) {
+    IS.state.lastFocus.focus({ preventScroll: true });
+  }
+  if (!document.getElementById('detail') || document.getElementById('detail').hidden) {
+    IS.state.lastFocus = null;
+  }
+};
+
+IS.openDetail = function (type, id) {
+  let kind = type;
+  let object = kind === 'algorithm' ? IS.maps.algorithms.get(id) : IS.maps.modules.get(id);
+  if (!object && kind === 'algorithm' && IS.maps.modules.has(id)) {
+    kind = 'module';
+    object = IS.maps.modules.get(id);
+  }
+  if (!object && kind === 'module' && IS.maps.algorithms.has(id)) {
+    kind = 'algorithm';
+    object = IS.maps.algorithms.get(id);
+  }
+  if (!object) {
+    console.warn('[InterStudy] 未找到深入条目', type, id);
+    return;
+  }
+
+  const detail = $('#detail');
+  const concept = $('#conceptModal');
+  const conceptOpen = !concept.hidden;
+
+  if (detail.hidden) {
+    IS.state.lastFocus = conceptOpen ? IS.state.lastFocus : document.activeElement;
+    lockBody();
+  }
+  if (conceptOpen) IS.closeConcept(false);
+
+  detail.dataset.type = kind;
+  detail.dataset.id = id;
+  $('#detailKicker').textContent = kind === 'algorithm' ? '算法深入' : '模块深入';
+  $('#detailTitle').textContent = object.name || id;
+  const body = $('#detailBody');
+  body.innerHTML = kind === 'algorithm' ? buildAlgorithmDetail(object) : buildModuleDetail(object);
+  setupCodeBlocks(body);
+  detail.hidden = false;
+  const panel = detail.querySelector('.detail-panel');
+  if (panel) panel.scrollTop = 0;
+  const close = $('#detailClose');
+  if (close) close.focus();
+};
+
+IS.closeDetail = function (restoreFocus = true) {
+  const detail = $('#detail');
+  if (!detail || detail.hidden) return;
+  detail.hidden = true;
+  detail.dataset.type = '';
+  detail.dataset.id = '';
+  unlockBody();
+  if (restoreFocus && IS.state.lastFocus && document.contains(IS.state.lastFocus)) {
+    IS.state.lastFocus.focus({ preventScroll: true });
+  }
+  IS.state.lastFocus = null;
+};
+
+IS.closeAllOverlays = function () {
+  if (!document.getElementById('conceptModal').hidden) IS.closeConcept(false);
+  if (!document.getElementById('detail').hidden) IS.closeDetail(false);
+};
+
+IS.renderSourcesSection = function () {
+  const section = $('#sources');
+  const root = $('#sourcesRoot');
+  const sources = IS.T.sources || [];
+  if (!sources.length) {
+    if (section) section.remove();
+    return;
+  }
+  root.innerHTML = sources.map(source => {
+    const title = source.url
+      ? `<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${esc(source.title || source.id)}</a>`
+      : esc(source.title || source.id);
+    const meta = [
+      sourceTypeLabel(source.type),
+      source.author,
+      source.publisher,
+      source.publishedAt ? `发表 ${source.publishedAt}` : '',
+      source.accessedAt ? `访问 ${source.accessedAt}` : ''
+    ].filter(Boolean).join(' · ');
+    const evidence = source.evidenceDescription
+      ? `<div class="source-evidence">${raw(source.evidenceDescription)}</div>`
+      : '';
+    return `<li class="source-item" id="src-${esc(source.id)}"><div class="source-title">${title}</div><div class="source-meta">${esc(meta)}</div>${evidence}</li>`;
+  }).join('');
+};
+
+/* 9 类 Scene 渲染器与步进控制 */
+const SCENE_LABELS = {
+  timeline: '时间轴',
+  architecture: '架构图',
+  sequence: '时序图',
+  process: '流程图',
+  comparison: '对比',
+  algorithm: '算法演示',
+  'data-structure': '数据结构',
+  concept: '概念图',
+  'future-scenario': '未来场景'
+};
+
+const FUTURE_STATUS = {
+  fact: { label: '已发生', className: 'status-fact' },
+  trend: { label: '进行中', className: 'status-trend' },
+  speculation: { label: '推测', className: 'status-speculation' }
+};
+
+function svgId(value) {
+  return String(value || 'scene').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function shortText(value, max) {
+  const text = String(value == null ? '' : value);
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+function wrapLabel(value, max, maxLines) {
+  const text = String(value == null ? '' : value).trim();
+  if (text.length <= max) return [text];
+  const lines = [];
+  let rest = text;
+  while (rest && lines.length < maxLines) {
+    if (rest.length <= max) {
+      lines.push(rest);
+      rest = '';
+      break;
+    }
+    let cut = rest.lastIndexOf(' ', max);
+    if (cut <= 0) cut = max;
+    lines.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest && lines.length) lines[lines.length - 1] = shortText(lines[lines.length - 1], max);
+  return lines;
+}
+
+function createStepper(host, total, onStep) {
+  const wrap = el('div', 'stepper');
+  const prev = el('button', '', '上一步');
+  const next = el('button', '', '下一步');
+  const label = el('span', 'step-label');
+  prev.type = 'button';
+  next.type = 'button';
+  let index = 0;
+
+  function render() {
+    label.textContent = `${index + 1} / ${total}`;
+    prev.disabled = index === 0;
+    next.disabled = index === total - 1;
+    onStep(index);
+  }
+
+  prev.addEventListener('click', () => {
+    if (index > 0) {
+      index -= 1;
+      render();
+    }
+  });
+  next.addEventListener('click', () => {
+    if (index < total - 1) {
+      index += 1;
+      render();
+    }
+  });
+
+  wrap.append(prev, label, next);
+  host.appendChild(wrap);
+  render();
+
+  return {
+    go(value) {
+      index = Math.max(0, Math.min(total - 1, value));
+      render();
+    },
+    get index() {
+      return index;
+    }
+  };
+}
+
+function renderTimeline(scene, body) {
+  const events = (scene.data && scene.data.events) || [];
+  if (!events.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无时间线数据。'));
+    return;
+  }
+  const list = el('ul', 'timeline');
+  events.forEach(event => {
+    const item = el('li');
+    item.innerHTML = `<div class="timeline-date">${esc(event.date || '')}</div>` +
+      `<div class="timeline-title">${esc(event.title || '')}</div>` +
+      (event.text ? `<p class="timeline-text">${raw(event.text)}</p>` : '') +
+      (event.sourceIds && event.sourceIds.length ? `<div class="chip-row">${sourceChips(event.sourceIds)}</div>` : '');
+    list.appendChild(item);
+  });
+  body.appendChild(list);
+
+  if (events.length > 1) {
+    createStepper(body, events.length, index => {
+      $$('li', list).forEach((item, i) => item.classList.toggle('active', i === index));
+    });
+  }
+}
+
+function renderArchitecture(scene, body) {
+  const data = scene.data || {};
+  const nodes = data.nodes || [];
+  const edges = data.edges || [];
+  if (!nodes.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无架构节点。'));
+    return;
+  }
+
+  const laidOut = nodes.map((node, i) => ({
+    ...node,
+    x: Number.isFinite(node.x) ? node.x : 30 + (i % 4) * 190,
+    y: Number.isFinite(node.y) ? node.y : 30 + Math.floor(i / 4) * 90,
+    w: Number.isFinite(node.w) ? node.w : 150,
+    h: Number.isFinite(node.h) ? node.h : 48
+  }));
+  const width = data.width || Math.max(320, ...laidOut.map(node => node.x + node.w)) + 30;
+  const height = data.height || Math.max(180, ...laidOut.map(node => node.y + node.h)) + 30;
+  const wrap = el('div', 'graph-wrap');
+  const svg = svgEl('svg', {
+    class: 'scene-graph',
+    viewBox: `0 0 ${width} ${height}`,
+    role: 'img',
+    'aria-label': scene.title || '架构图'
+  });
+
+  const markerId = `arrow-${svgId(scene.id)}`;
+  const defs = svgEl('defs');
+  const marker = svgEl('marker', {
+    id: markerId,
+    viewBox: '0 0 10 10',
+    refX: '9',
+    refY: '5',
+    markerWidth: '6',
+    markerHeight: '6',
+    orient: 'auto'
+  });
+  marker.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z', class: 'arrow' }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const nodeMap = new Map(laidOut.map(node => [node.id, node]));
+  edges.forEach(edge => {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) return;
+    const x1 = from.x + from.w / 2;
+    const y1 = from.y + from.h / 2;
+    const x2 = to.x + to.w / 2;
+    const y2 = to.y + to.h / 2;
+    const group = svgEl('g', {
+      class: `edge${edge.dashed ? ' dashed' : ''}`,
+      'data-from': edge.from,
+      'data-to': edge.to
+    });
+    group.appendChild(svgEl('line', { x1, y1, x2, y2, 'marker-end': `url(#${markerId})` }));
+    if (edge.label) {
+      const label = svgEl('text', { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 6 });
+      label.textContent = shortText(edge.label, 18);
+      group.appendChild(label);
+    }
+    svg.appendChild(group);
+  });
+
+  laidOut.forEach(node => {
+    const group = svgEl('g', {
+      class: 'node',
+      'data-node': node.id,
+      'data-group': node.group || 'component'
+    });
+    group.appendChild(svgEl('rect', { x: node.x, y: node.y, width: node.w, height: node.h, rx: 8 }));
+    const label = node.label || node.id;
+    const lines = wrapLabel(label, 16, 2);
+    const text = svgEl('text', {
+      x: node.x + node.w / 2,
+      y: node.y + node.h / 2 - ((lines.length - 1) * 14) / 2
+    });
+    lines.forEach((line, i) => {
+      const tspan = svgEl('tspan', { x: node.x + node.w / 2, dy: i === 0 ? 0 : 14 });
+      tspan.textContent = line;
+      text.appendChild(tspan);
+    });
+    const title = svgEl('title');
+    title.textContent = label;
+    group.append(title, text);
+    svg.appendChild(group);
+  });
+
+  wrap.appendChild(svg);
+  body.appendChild(wrap);
+
+  const detail = el('div', 'scene-detail');
+  detail.innerHTML = '<span class="empty">点击节点查看说明。</span>';
+  body.appendChild(detail);
+
+  svg.addEventListener('click', event => {
+    const nodeEl = event.target.closest('.node');
+    if (!nodeEl) return;
+    const id = nodeEl.dataset.node;
+    const node = nodeMap.get(id);
+    $$('.node', svg).forEach(item => item.classList.toggle('active', item.dataset.node === id));
+    $$('.edge', svg).forEach(item => item.classList.toggle('active', item.dataset.from === id || item.dataset.to === id));
+    if (!node) return;
+    detail.innerHTML = `<strong>${esc(node.label || node.id)}</strong>` +
+      (node.detail ? ` ${raw(node.detail)}` : '') +
+      (node.sourceIds && node.sourceIds.length ? `<div class="chip-row">${sourceChips(node.sourceIds)}</div>` : '');
+  });
+}
+
+function renderSequence(scene, body) {
+  const data = scene.data || {};
+  const actors = data.actors || [];
+  const messages = data.messages || [];
+  if (!actors.length || !messages.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无时序数据。'));
+    return;
+  }
+
+  const actorList = actors.map((actor, i) => {
+    const label = typeof actor === 'string' ? actor : (actor.label || actor.id || `Actor ${i + 1}`);
+    const id = typeof actor === 'string' ? actor : (actor.id || label);
+    return { id, label, x: 90 + i * 170 };
+  });
+  const actorMap = new Map();
+  actorList.forEach(actor => {
+    actorMap.set(actor.id, actor);
+    actorMap.set(actor.label, actor);
+  });
+  const messageList = messages.map(message => ({
+    ...message,
+    fromActor: actorMap.get(message.from),
+    toActor: actorMap.get(message.to)
+  })).filter(message => message.fromActor && message.toActor);
+  if (!messageList.length) {
+    body.appendChild(el('div', 'scene-empty', '消息引用了不存在的 actor。'));
+    return;
+  }
+
+  const width = Math.max(360, actorList.length * 170 + 40);
+  const height = 110 + messageList.length * 56 + 30;
+  const svg = svgEl('svg', {
+    class: 'sequence-svg',
+    viewBox: `0 0 ${width} ${height}`,
+    role: 'img',
+    'aria-label': scene.title || '时序图'
+  });
+
+  const markerId = `seq-arrow-${svgId(scene.id)}`;
+  const defs = svgEl('defs');
+  const marker = svgEl('marker', {
+    id: markerId,
+    viewBox: '0 0 10 10',
+    refX: '9',
+    refY: '5',
+    markerWidth: '6',
+    markerHeight: '6',
+    orient: 'auto'
+  });
+  marker.appendChild(svgEl('path', { d: 'M 0 0 L 10 5 L 0 10 z', class: 'arrow' }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  actorList.forEach(actor => {
+    svg.appendChild(svgEl('line', {
+      class: 'sequence-lifeline',
+      x1: actor.x,
+      y1: 58,
+      x2: actor.x,
+      y2: height - 20
+    }));
+  });
+
+  actorList.forEach(actor => {
+    const group = svgEl('g', { class: 'sequence-actor' });
+    group.appendChild(svgEl('rect', { x: actor.x - 65, y: 16, width: 130, height: 38, rx: 7 }));
+    const text = svgEl('text', { x: actor.x, y: 35 });
+    text.textContent = shortText(actor.label, 16);
+    const title = svgEl('title');
+    title.textContent = actor.label;
+    group.append(title, text);
+    svg.appendChild(group);
+  });
+
+  const messageEls = [];
+  messageList.forEach((message, i) => {
+    const y = 110 + i * 56;
+    const group = svgEl('g', { class: 'sequence-message', 'data-index': i });
+    if (message.fromActor === message.toActor) {
+      const x = message.fromActor.x;
+      group.appendChild(svgEl('path', {
+        d: `M ${x} ${y - 10} C ${x + 50} ${y - 28}, ${x + 50} ${y + 28}, ${x} ${y + 10}`,
+        fill: 'none',
+        'marker-end': `url(#${markerId})`
+      }));
+      const label = svgEl('text', { x: x + 34, y: y - 16 });
+      label.textContent = shortText(message.label || '', 24);
+      group.appendChild(label);
+    } else {
+      const x1 = message.fromActor.x;
+      const x2 = message.toActor.x;
+      group.appendChild(svgEl('line', { x1, y1: y, x2, y2: y, 'marker-end': `url(#${markerId})` }));
+      const label = svgEl('text', { x: (x1 + x2) / 2, y: y - 8 });
+      label.textContent = shortText(message.label || '', 28);
+      group.appendChild(label);
+    }
+    svg.appendChild(group);
+    messageEls.push(group);
+  });
+
+  const wrap = el('div', 'sequence-wrap');
+  wrap.appendChild(svg);
+  body.appendChild(wrap);
+
+  const detail = el('div', 'scene-detail');
+  body.appendChild(detail);
+
+  function setStep(index) {
+    messageEls.forEach((item, i) => {
+      item.classList.toggle('active', i === index);
+      item.classList.toggle('dim', i > index);
+    });
+    const message = messageList[index];
+    if (!message) {
+      detail.innerHTML = '';
+      return;
+    }
+    detail.innerHTML = `<strong>${esc(message.fromActor.label)} → ${esc(message.toActor.label)}</strong>` +
+      (message.label ? ` · ${esc(message.label)}` : '') +
+      (message.note ? `<div>${raw(message.note)}</div>` : '') +
+      (message.sourceIds && message.sourceIds.length ? `<div class="chip-row">${sourceChips(message.sourceIds)}</div>` : '');
+  }
+
+  if (messageList.length > 1) createStepper(body, messageList.length, setStep);
+  else setStep(0);
+}
+
+function renderProcess(scene, body) {
+  const steps = (scene.data && scene.data.steps) || [];
+  if (!steps.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无流程步骤。'));
+    return;
+  }
+
+  const grid = el('div', 'process-grid');
+  const detail = el('div', 'step-detail');
+  let stepper = null;
+
+  function setStep(index) {
+    $$('.process-step', grid).forEach((button, i) => button.classList.toggle('active', i === index));
+    const step = steps[index];
+    if (!step) {
+      detail.innerHTML = '';
+      return;
+    }
+    const state = step.state && typeof step.state === 'object' ? Object.entries(step.state) : [];
+    detail.innerHTML = `<strong>${esc(step.title || '')}</strong>` +
+      (step.text ? `<div>${raw(step.text)}</div>` : '') +
+      (state.length ? `<table class="state-table">${state.map(([key, value]) => `<tr><th>${esc(key)}</th><td>${esc(value)}</td></tr>`).join('')}</table>` : '') +
+      (step.sourceIds && step.sourceIds.length ? `<div class="chip-row">${sourceChips(step.sourceIds)}</div>` : '');
+  }
+
+  steps.forEach((step, i) => {
+    const button = el('button', 'process-step');
+    button.type = 'button';
+    button.innerHTML = `<div class="num">STEP ${i + 1}</div><div class="t">${esc(step.title || '')}</div>`;
+    button.addEventListener('click', () => {
+      if (stepper) stepper.go(i);
+      else setStep(i);
+    });
+    grid.appendChild(button);
+  });
+
+  body.append(grid, detail);
+  if (steps.length > 1) stepper = createStepper(body, steps.length, setStep);
+  else setStep(0);
+}
+
+function renderComparison(scene, body) {
+  const data = scene.data || {};
+  const dimensions = data.dimensions || [];
+  const options = data.options || [];
+  if (!dimensions.length || !options.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无对比数据。'));
+    return;
+  }
+
+  const wrap = el('div', 'table-wrap');
+  const table = el('table', 'comparison-table');
+  table.innerHTML = `<thead><tr><th>维度</th>${options.map(option =>
+    `<th class="${option.highlight ? 'highlight-col' : ''}">${esc(option.name || '')}${option.highlight ? '<span class="option-badge">推荐</span>' : ''}</th>`
+  ).join('')}</tr></thead><tbody>${dimensions.map((dimension, i) =>
+    `<tr><th>${esc(dimension)}</th>${options.map(option =>
+      `<td class="${option.highlight ? 'highlight-col' : ''}">${raw((option.values || [])[i] || '')}</td>`
+    ).join('')}</tr>`
+  ).join('')}</tbody>`;
+  wrap.appendChild(table);
+  body.appendChild(wrap);
+  if (data.note) {
+    const note = el('p', 'scene-note');
+    note.innerHTML = raw(data.note);
+    body.appendChild(note);
+  }
+}
+
+function renderAlgorithm(scene, body) {
+  const data = scene.data || {};
+  if (data.formula) {
+    const formula = el('div', 'formula');
+    formula.innerHTML = raw(data.formula);
+    body.appendChild(formula);
+  }
+
+  const columns = data.columns || [];
+  const rows = data.rows || [];
+  if (columns.length || rows.length) {
+    const wrap = el('div', 'algo-table-wrap');
+    const table = el('table', 'algo-table');
+    table.innerHTML = `<thead><tr>${columns.map(column => `<th>${esc(column)}</th>`).join('')}</tr></thead>` +
+      `<tbody>${rows.map((row, i) => `<tr data-row="${i}">${row.map(cell => `<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    wrap.appendChild(table);
+    body.appendChild(wrap);
+    if (data.note) {
+      const note = el('p', 'scene-note');
+      note.innerHTML = raw(data.note);
+      body.appendChild(note);
+    }
+    if (rows.length > 1) {
+      createStepper(body, rows.length, index => {
+        $$('tbody tr', table).forEach((row, i) => row.classList.toggle('active', i === index));
+      });
+    }
+  } else if (data.note) {
+    const note = el('p', 'scene-note');
+    note.innerHTML = raw(data.note);
+    body.appendChild(note);
+  }
+}
+
+function renderDataStructure(scene, body) {
+  const data = scene.data || {};
+  const items = data.items || [];
+  if (!items.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无结构数据。'));
+    return;
+  }
+
+  const grid = el('div', 'ds-grid');
+  items.forEach((item, i) => {
+    const label = typeof item === 'string' ? String(i) : (item.label != null ? item.label : String(i));
+    const value = typeof item === 'string' ? item : (item.value != null ? item.value : '');
+    const cell = el('div', 'ds-cell');
+    cell.innerHTML = `<div class="ds-label">${esc(label)}</div><div class="ds-value">${esc(value)}</div>`;
+    grid.appendChild(cell);
+  });
+  body.appendChild(grid);
+
+  const steps = data.steps || [];
+  if (!steps.length) return;
+  const detail = el('div', 'step-detail');
+  body.appendChild(detail);
+
+  function setStep(index) {
+    const step = steps[index];
+    const highlight = new Set((step && step.highlight) || []);
+    $$('.ds-cell', grid).forEach((cell, i) => cell.classList.toggle('active', highlight.has(i)));
+    if (!step) {
+      detail.innerHTML = '';
+      return;
+    }
+    detail.innerHTML = `<strong>${esc(step.title || '')}</strong>` +
+      (step.text ? `<div>${raw(step.text)}</div>` : '') +
+      (step.sourceIds && step.sourceIds.length ? `<div class="chip-row">${sourceChips(step.sourceIds)}</div>` : '');
+  }
+
+  if (steps.length > 1) createStepper(body, steps.length, setStep);
+  else setStep(0);
+}
+
+function conceptChip(id) {
+  const concept = IS.maps.concepts.get(id);
+  const name = concept ? concept.name : id;
+  if (!concept) return `<span class="concept-chip">${esc(name)}</span>`;
+  return `<button type="button" class="concept-chip" data-concept="${esc(id)}">${esc(name)}</button>`;
+}
+
+function renderConceptScene(scene, body) {
+  const data = scene.data || {};
+  const groups = data.groups || [];
+  const edges = data.edges || [];
+  if (!groups.length && !edges.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无概念数据。'));
+    return;
+  }
+
+  if (groups.length) {
+    const grid = el('div', 'concept-groups');
+    groups.forEach(group => {
+      const card = el('div', 'concept-group');
+      card.innerHTML = `<h4>${esc(group.name || '')}</h4>` +
+        `<div class="concept-chips">${(group.concepts || []).map(conceptChip).join('')}</div>`;
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+  }
+
+  if (edges.length) {
+    const list = el('ul', 'relation-list');
+    edges.forEach(edge => {
+      const item = el('li');
+      item.innerHTML = (edge.label ? `<span class="pill">${esc(edge.label)}</span> ` : '') +
+        `${conceptChip(edge.from)}<span class="arrow">→</span>${conceptChip(edge.to)}`;
+      list.appendChild(item);
+    });
+    body.appendChild(list);
+  }
+}
+
+function renderFuture(scene, body) {
+  const branches = (scene.data && scene.data.branches) || [];
+  if (!branches.length) {
+    body.appendChild(el('div', 'scene-empty', '暂无未来分支。'));
+    return;
+  }
+
+  const legend = el('div', 'future-legend');
+  legend.innerHTML = Object.values(FUTURE_STATUS)
+    .map(info => `<span class="status-badge ${info.className}">${info.label}</span>`)
+    .join('');
+  body.appendChild(legend);
+
+  const grid = el('div', 'future-grid');
+  branches.forEach(branch => {
+    const info = FUTURE_STATUS[branch.status] || FUTURE_STATUS.speculation;
+    const card = el('div', 'future-card');
+    card.innerHTML = `<span class="status-badge ${info.className}">${info.label}</span>` +
+      `<h4>${esc(branch.title || '')}</h4>` +
+      (branch.text ? `<p>${raw(branch.text)}</p>` : '') +
+      (branch.evidence ? `<div class="future-evidence"><strong>依据：</strong>${raw(branch.evidence)}</div>` : '') +
+      (branch.sourceIds && branch.sourceIds.length ? `<div class="chip-row">${sourceChips(branch.sourceIds)}</div>` : '');
+    grid.appendChild(card);
+  });
+  body.appendChild(grid);
+}
+
+const SCENE_RENDERERS = {
+  timeline: renderTimeline,
+  architecture: renderArchitecture,
+  sequence: renderSequence,
+  process: renderProcess,
+  comparison: renderComparison,
+  algorithm: renderAlgorithm,
+  'data-structure': renderDataStructure,
+  concept: renderConceptScene,
+  'future-scenario': renderFuture
+};
+
+function renderScene(scene, index) {
+  const figure = el('figure', 'scene');
+  figure.id = `scene-${scene.id}`;
+  const head = el('div', 'scene-head');
+  head.innerHTML = `<div class="scene-kicker">Scene ${index + 1} · ${esc(SCENE_LABELS[scene.type] || scene.type)}</div>` +
+    `<h3>${esc(scene.title || '')}</h3>` +
+    (scene.description ? `<p class="scene-desc">${raw(scene.description)}</p>` : '');
+  figure.appendChild(head);
+
+  const body = el('div', 'scene-body');
+  figure.appendChild(body);
+  const renderer = SCENE_RENDERERS[scene.type];
+  if (renderer) renderer(scene, body);
+  else body.appendChild(el('div', 'scene-empty', `未知场景类型：${esc(scene.type)}`));
+
+  if (scene.sourceIds && scene.sourceIds.length) {
+    const sources = el('div', 'scene-sources');
+    sources.innerHTML = `<span>来源：</span>${sourceChips(scene.sourceIds)}`;
+    figure.appendChild(sources);
+  }
+  return figure;
+}
+
+IS.renderScenesInChapter = function (contentEl, chapter) {
+  const placed = new Set();
+  let index = 0;
+  $$('[data-scene]', contentEl).forEach(slot => {
+    const id = slot.dataset.scene;
+    placed.add(id);
+    const scene = IS.maps.scenes.get(id);
+    if (!scene) {
+      slot.replaceWith(el('div', 'scene-empty', `未找到场景：${esc(id)}`));
+      index += 1;
+      return;
+    }
+    slot.replaceWith(renderScene(scene, index));
+    index += 1;
+  });
+
+  ((chapter && chapter.sceneIds) || []).forEach(id => {
+    if (placed.has(id)) return;
+    const scene = IS.maps.scenes.get(id);
+    if (!scene) return;
+    contentEl.appendChild(renderScene(scene, index));
+    index += 1;
+  });
+};
+
+/* 测验：即时反馈、计分、重置 */
+IS.renderQuiz = function () {
+  const section = $('#quiz');
+  const root = $('#quizRoot');
+  const quiz = IS.T.quiz || [];
+  if (!quiz.length) {
+    if (section) section.remove();
+    return;
+  }
+
+  root.innerHTML = '';
+  let answered = 0;
+  let correct = 0;
+
+  const score = el('div', 'quiz-score');
+  score.setAttribute('aria-live', 'polite');
+  score.innerHTML = `<span>已答 <strong>0</strong> / ${quiz.length}</span>` +
+    `<span>正确 <strong>0</strong></span>` +
+    '<button class="quiz-reset" type="button">重新作答</button>';
+  root.appendChild(score);
+
+  const answeredEl = score.querySelector('span:nth-child(1) strong');
+  const correctEl = score.querySelector('span:nth-child(2) strong');
+  const cards = [];
+
+  function updateScore() {
+    answeredEl.textContent = answered;
+    correctEl.textContent = correct;
+  }
+
+  quiz.forEach((item, questionIndex) => {
+    const card = el('div', 'quiz-card');
+    card.dataset.answered = '0';
+    const options = item.options || [];
+    card.innerHTML = `<p class="quiz-q">${questionIndex + 1}. ${esc(item.question || '')}</p>` +
+      `<div class="quiz-options">${options.map((option, optionIndex) =>
+        `<button class="quiz-option" type="button" data-option="${optionIndex}">` +
+        `<span class="key">${String.fromCharCode(65 + optionIndex)}</span><span>${esc(option)}</span></button>`
+      ).join('')}</div>` +
+      '<div class="quiz-explanation" hidden></div>';
+
+    const explanation = card.querySelector('.quiz-explanation');
+    const buttons = $$('.quiz-option', card);
+    const correctIndex = Number(item.answer);
+
+    buttons.forEach((button, optionIndex) => {
+      button.addEventListener('click', () => {
+        if (card.dataset.answered === '1') return;
+        card.dataset.answered = '1';
+        answered += 1;
+        const isCorrect = optionIndex === correctIndex;
+        if (isCorrect) correct += 1;
+
+        buttons.forEach((optionButton, i) => {
+          optionButton.disabled = true;
+          if (i === correctIndex) optionButton.classList.add('correct');
+          else if (i === optionIndex) optionButton.classList.add('wrong');
+        });
+
+        const verdict = isCorrect
+          ? '<strong>回答正确。</strong>'
+          : `<strong>回答错误。</strong> 正确答案是 ${String.fromCharCode(65 + correctIndex)}。`;
+        explanation.innerHTML = `${verdict} ${item.explanation ? raw(item.explanation) : ''}`;
+        explanation.hidden = false;
+        updateScore();
+      });
+    });
+
+    cards.push(card);
+    root.appendChild(card);
+  });
+
+  score.querySelector('.quiz-reset').addEventListener('click', () => {
+    answered = 0;
+    correct = 0;
+    updateScore();
+    cards.forEach(card => {
+      card.dataset.answered = '0';
+      $$('.quiz-option', card).forEach(button => {
+        button.disabled = false;
+        button.classList.remove('correct', 'wrong');
+      });
+      const explanation = $('.quiz-explanation', card);
+      explanation.hidden = true;
+      explanation.innerHTML = '';
+    });
+  });
+};
+
+/* 启动 */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', IS.init);
+} else {
+  IS.init();
+}
+
+  </script>
+</body>
+</html>
